@@ -67,5 +67,7 @@ Meet the amazing minds behind the platform:
 ---
 
 <div align="center">
-  <i>Empowering agriculture, one line of code at a time. ❤️ <br> <b>- Team Plant Doctors</b></i>
+  <i>Empowering agriculture, one line of code at a time. ❤️ <br> <b>- Team Plant Doctors</b></i><br>
+  <a href="https://github.com/Ayush-0918/AI-PLANT-DOCTOR-S-.git">Repository: Ayush-0918/AI-PLANT-DOCTOR-S-</a>
 </div>
+

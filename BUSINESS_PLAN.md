@@ -378,4 +378,6 @@ Recommended first production training pool:
 
 ---
 
-If you want, next pass can directly execute **Step A hard-cutover**: frontend routes fully migrated to `/api/v1`, legacy endpoints marked deprecated, and production lock enabled with a kill-switch.
+*Repository: https://github.com/Ayush-0918/AI-PLANT-DOCTOR-S-.git*  
+*Status: Strategy & Business Architecture Active*
+
