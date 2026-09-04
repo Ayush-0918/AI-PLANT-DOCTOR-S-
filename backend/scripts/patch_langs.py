@@ -1,5 +1,3 @@
-import re
-import os
 
 fp = "/Users/aayu/Plant Doctors/web/src/context/LanguageContext.tsx"
 with open(fp, "r", encoding="utf-8") as f:

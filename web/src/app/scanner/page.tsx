@@ -503,7 +503,7 @@ export default function ScannerPage() {
                         </div>
                      ) : (
                         <>
-                           <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
+                           <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
 
                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                               <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 70% at center, transparent 40%, rgba(0,0,0,0.7) 100%)' }} />

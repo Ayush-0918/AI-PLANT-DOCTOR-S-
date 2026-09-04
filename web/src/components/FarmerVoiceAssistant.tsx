@@ -373,7 +373,7 @@ export default function FarmerVoiceAssistant({ onClose }: FarmerVoiceAssistantPr
         {transcript && (
           <motion.div key={`tr-${transcript.slice(0,10)}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex justify-end mb-2">
             <div className="max-w-[80%] rounded-2xl rounded-br-sm px-3 py-2 bg-emerald-100 border border-emerald-200">
-              <p className="text-xs text-emerald-800 font-medium">"{transcript}"</p>
+              <p className="text-xs text-emerald-800 font-medium">&quot;{transcript}&quot;</p>
             </div>
           </motion.div>
         )}

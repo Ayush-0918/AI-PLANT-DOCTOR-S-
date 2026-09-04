@@ -741,7 +741,7 @@ export default function DashboardPage() {
               <div
                 className="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl bg-white shadow-sm transition-all"
                 style={{
-                  ring: isActive ? '2px solid #10b981' : '1px solid rgba(0,0,0,0.05)',
+                  outline: isActive ? '2px solid #10b981' : '1px solid rgba(0,0,0,0.05)',
                   boxShadow: isActive
                     ? '0 0 0 2.5px #10b981, 0 4px 12px rgba(16,185,129,0.25)'
                     : '0 1px 4px rgba(0,0,0,0.06)',

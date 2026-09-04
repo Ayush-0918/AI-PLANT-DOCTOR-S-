@@ -6,21 +6,11 @@ import os
 
 # The full 38-class PlantVillage Dataset Mapping
 PLANTVILLAGE_CLASSES = {
-    0: "Apple___Apple_scab", 1: "Apple___Black_rot", 2: "Apple___Cedar_apple_rust", 3: "Apple___healthy",
-    4: "Blueberry___healthy", 5: "Cherry_(including_sour)___Powdery_mildew", 6: "Cherry_(including_sour)___healthy",
-    7: "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot", 8: "Corn_(maize)___Common_rust_", 
-    9: "Corn_(maize)___Northern_Leaf_Blight", 10: "Corn_(maize)___healthy", 11: "Grape___Black_rot",
-    12: "Grape___Esca_(Black_Measles)", 13: "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)", 14: "Grape___healthy",
-    15: "Orange___Haunglongbing_(Citrus_greening)", 16: "Peach___Bacterial_spot", 17: "Peach___healthy",
-    18: "Pepper,_bell___Bacterial_spot", 19: "Pepper,_bell___healthy", 20: "Potato___Early_blight",
-    21: "Potato___Late_blight", 22: "Potato___healthy", 23: "Raspberry___healthy", 24: "Soybean___healthy",
-    25: "Squash___Powdery_mildew", 26: "Strawberry___Leaf_scorch", 27: "Strawberry___healthy",
-    28: "Tomato___Bacterial_spot", 29: "Tomato___Early_blight", 30: "Tomato___Late_blight",
-    31: "Tomato___Leaf_Mold", 32: "Tomato___Septoria_leaf_spot", 33: "Tomato___Spider_mites Two-spotted_spider_mite",
-    34: "Tomato___Target_Spot",    35: "Tomato___Tomato_Yellow_Leaf_Curl_Virus", 36: "Tomato___Tomato_mosaic_virus", 37: "Tomato___healthy"
+    0: "Background_without_leaves",
+    1: "Gudhal___healthy"
 }
 
-NUM_CLASSES = 38
+NUM_CLASSES = 2
 
 # Comprehensive Treatment Data for all 38 PlantVillage Classes
 PLANT_TREATMENTS = {
@@ -172,9 +162,13 @@ PLANT_TREATMENTS = {
         "medicine": "N/A", "pesticide": "N/A", "dosage": "N/A",
         "instructions": "No cure. Remove and burn infected plants. Wash hands after handling."
     },
-    "Tomato___healthy": {
+    "Gudhal___healthy": {
         "medicine": "N/A", "pesticide": "N/A", "dosage": "N/A",
-        "instructions": "Excellent health. Maintain consistent watering to prevent blossom end rot."
+        "instructions": "Your Hibiscus (Gudhal) is perfectly healthy! Make sure to water it well regularly, keeping the soil moist but not waterlogged, and ensure good sunlight."
+    },
+    "Background_without_leaves": {
+        "medicine": "N/A", "pesticide": "N/A", "dosage": "N/A",
+        "instructions": "Please scan a valid plant leaf."
     }
 }
 

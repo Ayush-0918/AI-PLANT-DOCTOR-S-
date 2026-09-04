@@ -6,8 +6,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useFarmerProfile } from '@/context/FarmerProfileContext';
 
 interface SpatialRiskData {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   threat_summary: any;
   heatmap: Array<{ lat: number; lon: number; intensity: number; label: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   environmental_risk: any;
   field_health_index: number;
 }

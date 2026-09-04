@@ -9,8 +9,7 @@ When 14+ farmers detect the same disease within 10km:
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
-from pymongo import GEO2D
+from typing import List, Dict, Any
 import numpy as np
 from collections import defaultdict
 from math import cos

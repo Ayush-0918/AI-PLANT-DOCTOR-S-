@@ -5,8 +5,8 @@ echo "---------------------------------------"
 
 echo "1. Checking backend dependencies..."
 cd "backend"
-# Use the root virtual environment
-source "../.venv/bin/activate"
+# Use the backend virtual environment
+source ".venv/bin/activate"
 pip install -r requirements.txt
 echo "Starting FastAPI Backend Engine on http://localhost:8000"
 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > backend.log 2>&1 &

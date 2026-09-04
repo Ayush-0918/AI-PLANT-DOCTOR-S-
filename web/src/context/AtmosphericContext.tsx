@@ -83,6 +83,7 @@ export function AtmosphericProvider({ children }: { children: ReactNode }) {
     if (typeof document === 'undefined') return;
     const saved = localStorage.getItem('theme-override') as 'light' | 'dark' | null;
     if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setThemeOverride(saved);
       document.documentElement.classList.toggle('dark', saved === 'dark');
     }

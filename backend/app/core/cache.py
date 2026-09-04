@@ -5,7 +5,6 @@ except ImportError:
 
 import json
 import os
-from functools import wraps
 from typing import Any, Optional
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")

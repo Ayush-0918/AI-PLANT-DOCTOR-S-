@@ -1,7 +1,6 @@
 import argparse
 import hashlib
 import json
-import os
 import random
 from collections import defaultdict
 from datetime import datetime, timezone

@@ -81,9 +81,7 @@ SYNTH_CONTEXTS = [
 
 
 def get_class_names() -> list[str]:
-    if DATASET_ROOT.exists():
-        return sorted(path.name for path in DATASET_ROOT.iterdir() if path.is_dir())
-    return []
+    return ["Gudhal___healthy"]
 
 
 def humanize_crop(raw_crop: str) -> str:

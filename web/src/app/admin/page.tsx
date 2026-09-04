@@ -63,7 +63,7 @@ function StatCard({
   delay = 0,
   fullWidth = false,
 }: {
-  icon: React.ElementType;
+  icon: React.ElementType<any>;
   label: string;
   value: string | number;
   sub?: string;
@@ -90,6 +90,7 @@ function StatCard({
       <div className="flex items-center gap-2 mb-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-xl"
           style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
+          {/* @ts-expect-error - Icon accepts size */}
           <Icon size={14} style={{ color }} />
         </div>
         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">{label}</p>
@@ -127,6 +128,7 @@ function SectionHeader({ icon: Icon, title, badge }: { icon: React.ElementType; 
       <div className="flex items-center gap-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl"
           style={{ background: 'rgba(125,211,252,0.1)', border: '1px solid rgba(125,211,252,0.2)' }}>
+          {/* @ts-expect-error - Icon accepts size */}
           <Icon size={15} className="text-sky-300" />
         </div>
         <h2 className="text-base font-black text-white">{title}</h2>

@@ -1,7 +1,6 @@
-import os
 import random
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import numpy as np  # type: ignore[import]
 import pandas as pd  # type: ignore[import]

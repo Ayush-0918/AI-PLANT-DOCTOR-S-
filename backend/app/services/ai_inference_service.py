@@ -1,4 +1,3 @@
-import os
 import time
 from pathlib import Path
 from datetime import datetime, timezone
@@ -6,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from app.ai_model import ai_model
 from app.core.config import settings
-from app.core.errors import DependencyError, ValidationError
+from app.core.errors import ValidationError
 from app.services.knowledge_base_service import (
     get_growth_care_recommendations,
     get_localized_treatment_summary,

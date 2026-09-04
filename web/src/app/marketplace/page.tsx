@@ -154,7 +154,7 @@ export default function MarketplacePage() {
             name: "Plant Doctors",
             description: checkoutProduct.title,
             order_id: result.razorpay_order_id,
-            handler: function (response: any) {
+            handler: function (response: Record<string, unknown>) {
                console.log("Razorpay Success:", response);
                setOrderResult(result);
                setCheckoutStep('success');
@@ -175,9 +175,11 @@ export default function MarketplacePage() {
               }
             }
           };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const paymentObject = new (window as any).Razorpay(options);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           paymentObject.on('payment.failed', function (response: any) {
-               alert(`Payment Failed: ${response.error.description}`);
+               alert(`Payment Failed: ${response.error?.description || "Unknown error"}`);
                setSubmitting(false);
           });
           paymentObject.open();

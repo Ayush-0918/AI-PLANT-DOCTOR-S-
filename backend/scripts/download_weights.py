@@ -8,7 +8,7 @@ MODEL_URL = "https://github.com/shivanandmn/Plant-Disease-Detection-using-CNN/ra
 SAVE_PATH = os.path.join(os.path.dirname(__file__), "..", "app", "plantvillage_model.pth")
 
 def download_weights():
-    print(f"🚀 Downloading PlantVillage MobileNetV3 weights from HuggingFace...")
+    print("🚀 Downloading PlantVillage MobileNetV3 weights from HuggingFace...")
     print(f"Target: {SAVE_PATH}")
     
     try:

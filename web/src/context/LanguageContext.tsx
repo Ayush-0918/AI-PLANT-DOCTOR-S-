@@ -187,9 +187,7 @@ const dictionary: Record<string, Record<string, string>> = {
     'intel_stable': 'Stable',
     'intel_per_quintal': 'per quintal',
     'intel_share_roi': 'Share Expected ROI',
-    'pd_suite': 'Plant Doctor Intelligence Suite',
-    'scanner_smart_rx': 'Smart AI Advice',
-    '247_hotline': '24/7 Expert Doctor Hotline'
+
   },
   'हिंदी': {
     'expert_title': 'विशेषज्ञ सहायता केंद्र',
@@ -360,10 +358,7 @@ const dictionary: Record<string, Record<string, string>> = {
     'intel_price_rising': 'कीमत बढ़ रही है',
     'intel_stable': 'स्थिर',
     'intel_per_quintal': 'प्रति क्विंटल',
-    'intel_share_roi': 'Expected ROI शेयर करें',
-    'pd_suite': 'प्लांट डॉक्टर इंटेलिजेंस सूट',
-    'scanner_smart_rx': 'स्मार्ट AI सलाह',
-    '247_hotline': '24/7 विशेषज्ञ डॉक्टर हॉटलाइन'
+    'intel_share_roi': 'Expected ROI शेयर करें'
   },
   'भोजपुरी': {
     'expert_title': 'विशेषज्ञ मदद केंद्र',
@@ -1009,37 +1004,7 @@ const dictionary: Record<string, Record<string, string>> = {
     'prof_prefs_sub': 'కెమెరా, వాయిస్, థీమ్',
     'prof_restart': 'ఓన్‌బోర్డింగ్ మళ్ళీ ప్రారంభించండి'
   }
-,
-    'scanner_pipeline_scan': 'Scan',
-    'scanner_pipeline_diagnose': 'Diagnose',
-    'scanner_pipeline_prevent': 'Prevent',
-    'scanner_pipeline_dosage': 'Dosage',
-    'scanner_pipeline_precaution': 'Precaution',
-    'scanner_app_title': 'Plant Scanner',
-    'scanner_analyzing_leaf': 'Analyzing Leaf',
-    'scanner_checking_pathogens': 'Checking against 38,000+ pathogens',
-    'scanner_step_0': 'Extracting visual features',
-    'scanner_step_1': 'Pattern matching diseases',
-    'scanner_step_2': 'Geo-locating outbreak data',
-    'scanner_ai_processing': 'AI Processing',
-    'scanner_high_severity': 'High Severity',
-    'scanner_medium_severity': 'Medium Severity',
-    'scanner_early_detection': 'Early Detection',
-    'scanner_match': 'Match',
-    'scanner_based_on_visual': 'Based on visual symptoms & local outbreak data',
-    'scanner_ai_action': 'AI Action',
-    'scanner_human_review': 'Human Review Recommended',
-    'scanner_spray_decision': 'Spray decision lene se pehle expert se confirm karein.',
-    'scanner_treatment_plan': 'Treatment Plan',
-    'scanner_btn_talk': 'Talk to Agronomist Now',
-    'scanner_btn_compute': 'Compute Exact Dosage',
-    'scanner_btn_shop': 'Shop Products',
-    'scanner_btn_new': 'New Scan',
-    'scanner_live_badge': 'Live',
-    'scanner_center_leaf': 'Center the affected leaf',
-    'scanner_camera_unavailable': 'Camera Unavailable',
-    'scanner_try_again': 'Try Again',
-    'scanner_upload_gallery': 'Or upload from gallery · Supports JPG, PNG, HEIC'};
+};
 
 interface LanguageContextType {
   language: string;
@@ -1059,12 +1024,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     try {
       const savedLanguage = window.localStorage.getItem(STORAGE_KEY);
       if (savedLanguage && dictionary[savedLanguage]) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLanguage(savedLanguage);
       }
     } catch (error) {
       console.error('Failed to restore language', error);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     try {

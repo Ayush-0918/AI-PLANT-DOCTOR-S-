@@ -123,7 +123,7 @@ def train_soil_classifier():
                     f.write("\n".join(class_names))
                 print(f"Saved model with {best_acc:.4f} accuracy")
 
-    print(f'Training finished. Model saved as soil_classifier.pth')
+    print('Training finished. Model saved as soil_classifier.pth')
 
 if __name__ == "__main__":
     train_soil_classifier()

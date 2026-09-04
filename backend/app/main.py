@@ -102,6 +102,7 @@ ROUTER_MAP = {
     "mandi": "app.api.routes.mandi",
     "ai_chat": "app.api.routes.ai_chat",
     "intelligence": "app.api.routes.intelligence",
+    "agents": "app.api.routes.agents",
 }
 
 import importlib
@@ -948,7 +949,8 @@ async def get_user_profile(user_id: str):
 # 13 — REAL AI ACCURACY (CONFUSION MATRIX & METRICS)
 @app.get("/api/admin/model_accuracy")
 async def get_model_accuracy():
-    import os, json
+    import os
+    import json
     metrics_path = os.path.join(os.path.dirname(__file__), "..", "static", "accuracy.json")
     if os.path.exists(metrics_path):
         try:
