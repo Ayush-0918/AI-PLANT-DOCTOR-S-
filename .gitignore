@@ -1,43 +1,49 @@
 # Environments
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 
-# Generated files
-ai_price_trends.png
-VISUAL_SUMMARY.md
-STATUS_READY.md
-QUICK_FIX_GUIDE.md
-PROJECT_UPGRADE_AUDIT.md
-ANALYSIS_COMPLETE.md
-CTO_PRODUCTION_TRANSFORMATION_PLAN.md
-REAL_WORLD_HONEST_REVIEW_AND_EXECUTION.md
+# Dependencies
+node_modules/
+**/node_modules/
+venv/
+.venv/
+**/venv/
+**/venv*/
 
 # Python
 *.pyc
 __pycache__/
-.venv/
+**/__pycache__/
 build/
 dist/
 *.egg-info/
 
-# Node
-node_modules/
+# Build & Coverage
 .next/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+dist/
+build/
+coverage/
 
-# Editor
+# Editor & OS
+.DS_Store
 .vscode/
 .idea/
 
-# OS
-.DS_Store
+# Credentials & Service Accounts
+serviceAccount*.json
+firebase-adminsdk*.json
+*-service-account*.json
+*.pem
+*.key
 
 # Logs
 *.log
-# Data and Models
+
+# Generated & Heavy Files
 PlantVillage-Dataset/
 backend/data/
 *.pth

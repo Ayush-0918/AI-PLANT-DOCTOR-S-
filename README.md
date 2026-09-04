@@ -30,47 +30,45 @@ Our core mission is simple: **Zero Crop Loss. Maximum Yield.**
 ## 💎 Core Capabilities & Features
 
 ### 1. 🔍 AI Crop Scanner
-- **38,000+ Pathogen Detection**: Utilizing MobileNetV3-Large baked into an optimized PyTorch pipeline for ultra-fast, on-device level inference.
+- **High-Accuracy Disease & Pathogen Detection**: Utilizing MobileNetV3-Large baked into an optimized PyTorch pipeline trained on 38+ crop disease classes and 38,000+ annotated leaf images.
 - **Real-Time AR Viewfinder**: An immersive, haptic-feedback enabled scanning experience.
 - **Smart Dosage Calculator**: Automatically calculates chemical to water mix ratios based on farm acreage and localized ground soil data.
 - **Automated PDF Reports**: Generates downloadable diagnostic PDFs in 7 regional languages for offline reference.
 
-### 2. 🎙️ Localized Voice AI (Powered by Vapi.ai)
+### 2. 🎙️ Localized Voice AI (Powered by Vapi.ai & Gemini)
 - **Outbound Expert Calling**: Smart AI agents that call farmers to ask diagnostic questions in their local dialects (Hindi, Bhojpuri, Punjabi, Marathi, etc.).
 - **Voice Commands**: Fully integrated voice navigation for low-literacy users. "Mera aalu chota hai" instantly routes to potato growth care recommendations.
 
 ### 3. 🌍 Geo-Threat Network
-- **Community Outbreak Mapping**: Live 2D sphere monitoring of nearby pest outbreaks.
-- **Early Warnings**: Push notifications telling farmers to spray preventive solutions if >14 farmers report a specific disease within a 10km radius.
+- **Community Outbreak Mapping**: Live spatial monitoring of nearby pest outbreaks.
+- **Early Warnings**: Proactive alerts notifying farmers when spatial density threshold of disease reports is detected within a 10km radius.
 - **Live OpenWeatherMap Integration**: Rain, heat-wave, and wind alerts to strategically prevent farmers from wasting pesticide during adverse climates.
 
 ### 4. 🛒 Premium Agritech Marketplace
 - **C2C & B2B Purchasing**: Connects farmers directly with pesticide sellers and heavy-machinery renters (tractors, harvesters).
-- **Embedded Razorpay / EMI**: Micro-financing for high-value machines to make modernization affordable.
+- **Embedded Razorpay Integration**: Direct checkout support with equipment rental micro-financing options.
 
 ---
 
-## 🏛️ Premium Policies & Guarantees
+## 🏛️ Platform Policies & Architecture Vision
 
-As a market-leading agritech organization, we strictly enforce the following **Premium Policies** to protect and serve our farmers.
+As a market-leading agritech organization, we design with the following **Core Principles** to protect and serve our farmers.
 
-### 🛡️ 1. Absolute Data Privacy & Zero-Selling Policy
+### 🛡️ 1. Absolute Data Privacy & Protection
 We understand that farm yield data and land acreage are sensitive. 
-- **Zero Third-Party Data Selling**: We will never sell crop health data, GPS locations, or mobile numbers to third-party ad networks or corporate agribusinesses.
-- **End-to-End Encryption**: All voice logs, crop scans, and chat histories are highly encrypted.
+- **Zero Third-Party Data Selling**: We do not sell crop health data, GPS locations, or mobile numbers to third-party ad networks or corporate agribusinesses.
+- **Privacy-First Storage**: All voice logs, crop scans, and chat histories are stored securely.
 
-### ⚖️ 2. AI Ethics & Transparency Policy
+### ⚖️ 2. AI Ethics & Transparency
 We recognize the physical cost of bad AI advice.
-- **Confidence Thresholds**: If our AI is less than 75% confident in a disease diagnosis, it **will not guess**. It will gracefully escalate the case to a verified human agronomist.
-- **Banned Chemicals Guardrail**: Our LLM and treatment recommendation engines are strictly programmed to *never* suggest internationally banned or highly hazardous pesticides. Organic alternatives are always presented first.
+- **Confidence Thresholds**: If our AI is below confidence thresholds in a disease diagnosis, it will flag uncertainty and recommend human expert verification.
+- **Safe Recommendations**: Our recommendation engines are programmed to prioritize organic and safe alternatives first.
 
-### ⏱️ 3. Expert Availability Service Level Agreement (SLA)
-- **15-Minute Agronomist Connect**: For critical alerts (e.g., locust swarms, sudden blight), premium users are guaranteed a phone connection with a registered agricultural scientist within 15 minutes.
+### ⏱️ 3. Expert Agronomist Network (Target SLA)
+- **Fast Agronomist Connect**: Target 15-minute escalation workflow for critical outbreaks (e.g., sudden blight or swarms) to connect farmers with verified specialists.
 
-### 💳 4. Financial Fairness & EMI Policy
-- **No Hidden Fees**: The marketplace utilizes transparent pricing logic. Equipment rentals are explicitly priced per hour/day.
-- **Zero-Interest Micro-Loans**: We partner with local NBFCs to provide 0% EMI on critical disease-prevention sprayers and seeds.
-- **100% Refund Guarantee**: If an agronomist consultation fails to resolve the issue within 14 days, the consultation fee is fully refunded.
+### 💳 4. Transparent Marketplace Pricing
+- **No Hidden Fees**: Equipment rentals are explicitly priced per hour/day with clear checkout breakdowns.
 
 ---
 
@@ -83,23 +81,23 @@ graph TD
     A[Frontend: Next.js + Tailwind + Framer] -->|REST / WebSockets| B(Backend: FastAPI Python)
     B --> C[(MongoDB Atlas - Geospatial Config)]
     B --> D[PyTorch Inference Engine]
-    B --> E[Vapi.ai Voice Synthesizer]
-    B --> F[Razorpay API]
+    B --> E[Vapi.ai / Gemini Voice Synthesis]
+    B --> F[Razorpay API Integration]
     B --> G[OpenWeatherMap API]
 ```
 
 #### Frontend Stack (Web & PWA)
-- **Next.js 14** (App Router)
-- **TailwindCSS** + Generic CSS Modules for ultra-premium Glassmorphism & Liquid UI.
-- **Framer Motion** for micro-interactions and haptic-fluid animations.
-- **Lucide React** for beautiful iconography.
+- **Next.js** (App Router)
+- **TailwindCSS** + Vanilla CSS for ultra-premium Glassmorphism UI.
+- **Framer Motion** for micro-interactions and animations.
+- **Lucide React** for icons.
 
 #### Backend Stack
 - **FastAPI** for asynchronous, extremely high-throughput API routing.
 - **Motor (Asyncio)** for non-blocking MongoDB communication.
-- **Redis** for blazingly fast in-memory caching of ML predictions and API routes.
+- **PyTorch** for MobileNetV3 disease diagnosis.
 - **ReportLab / FPDF** for dynamic, multi-lingual PDF generation.
-- **gTTS** & **Vapi** for NLP and Text-to-Speech logic.
+- **Vapi.ai & Google Gemini** for Voice & Conversational AI.
 
 ---
 
@@ -114,8 +112,8 @@ It is strongly recommended to have **MongoDB** and **Redis** running locally bef
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
 # Rename environment file
@@ -149,9 +147,4 @@ If you are looking for specific phase deliveries, architectural blueprints, or U
 <div align="center">
   <p>Built with ❤️ for the Global Farming Community.</p>
 </div>
-# AI-PLANT-DOCTOR-S-CC3H-102
-# AI-PLANT-DOCTOR-S-CC3H-102
-# AI-PLANT-DOCTOR-S-CC3H-102
-# AI-PLANT-DOCTOR-S-CC3H-102
-# AI-PLANT-DOCTOR-S-CC3H-102
-# AI-PLANT-DOCTOR-S-CC3H-102
+
