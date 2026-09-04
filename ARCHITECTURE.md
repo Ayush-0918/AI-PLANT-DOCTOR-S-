@@ -202,6 +202,7 @@ To run the entire ecosystem locally:
 3.  **Access**:
     - **Frontend**: [http://localhost:3000](http://localhost:3000)
     - **Backend API**: [http://localhost:8000/docs](http://localhost:8000/docs)
+    - **Repository**: [https://github.com/Ayush-0918/AI-PLANT-DOCTOR-S-.git](https://github.com/Ayush-0918/AI-PLANT-DOCTOR-S-.git)
 
 ---
 
@@ -212,4 +213,5 @@ To run the entire ecosystem locally:
 
 ---
 
-> **Built for the billion-dollar future of Agriculture.** 🌾✨
+> **Built for the global future of Precision Agriculture.** 🌾✨
+
