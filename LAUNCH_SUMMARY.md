@@ -355,4 +355,6 @@ Each language has:
 
 ---
 
-*Last Updated: April 18, 2026 | System Status: LIVE & OPTIMIZED*
+*System Status: LIVE & OPTIMIZED*  
+*Repository: https://github.com/Ayush-0918/AI-PLANT-DOCTOR-S-.git*
+
