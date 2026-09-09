@@ -102,7 +102,6 @@ ROUTER_MAP = {
     "mandi": "app.api.routes.mandi",
     "ai_chat": "app.api.routes.ai_chat",
     "intelligence": "app.api.routes.intelligence",
-    "agents": "app.api.routes.agents",
 }
 
 import importlib
@@ -113,6 +112,12 @@ for name, module_path in ROUTER_MAP.items():
         print(f"✅ V1 Router Loaded: {name}")
     except Exception as e:
         print(f"❌ Failed to load V1 router {name}: {e}")
+
+# Verify single-entry-point enforcement for farmer chat endpoints
+chat_endpoint_paths = [r.path for r in app.routes if getattr(r, 'path', '').endswith('/chat')]
+if len(set(chat_endpoint_paths)) < len(chat_endpoint_paths):
+    raise RuntimeError(f"🚨 ROUTE COLLISION DETECTED! Multiple routes registered for same chat path: {chat_endpoint_paths}")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -478,7 +483,7 @@ async def get_threat_alerts(lat: float, lon: float, radius: int = 10):
     
     try:
         # Import threat service
-        from app.services.threat_map_service import ThreatMapService  # type: ignore[import]
+        from app.services.market import ThreatMapService  # type: ignore[import]
         
         # Ensure geospatial index exists
         service = ThreatMapService(db)

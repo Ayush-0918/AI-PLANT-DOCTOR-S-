@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import enforce_rate_limit, get_current_user
 from app.core.database import get_database
 from app.models.schemas import LoginRequest, RegisterRequest, TokenResponse, UserPublic
-from app.services.auth_service import authenticate_user, issue_user_token, register_user
+from app.services.auth import authenticate_user, issue_user_token, register_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"], dependencies=[Depends(enforce_rate_limit)])
 

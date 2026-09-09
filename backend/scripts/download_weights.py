@@ -4,8 +4,8 @@ import httpx  # type: ignore[import]
 # URL for a pre-trained MobileNetV3 (PlantVillage 38-class)
 # This is a community-contributed model on HuggingFace for these 38 classes
 # Alternative Public URL for PlantVillage weights (38 classes)
-MODEL_URL = "https://github.com/shivanandmn/Plant-Disease-Detection-using-CNN/raw/master/models/plant_disease_model.pth"
-SAVE_PATH = os.path.join(os.path.dirname(__file__), "..", "app", "plantvillage_model.pth")
+SAVE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "models", "plantvillage_model.pth")
+
 
 def download_weights():
     print("🚀 Downloading PlantVillage MobileNetV3 weights from HuggingFace...")

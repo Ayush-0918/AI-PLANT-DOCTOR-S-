@@ -45,6 +45,17 @@ firebase-adminsdk*.json
 
 # Generated & Heavy Files
 PlantVillage-Dataset/
-backend/data/
+backend/data/*
+!backend/data/datasets/
+!backend/data/datasets/**/
+!backend/data/datasets/**/README.md
+!backend/data/models/
+!backend/data/models/README.md
+backend/data/**/*.csv
+backend/data/**/*.jpg
+backend/data/**/*.png
+backend/data/**/*.zip
 *.pth
 *.pt
+*.h5
+*.onnx

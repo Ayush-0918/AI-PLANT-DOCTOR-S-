@@ -5,9 +5,11 @@ from uuid import uuid4
 
 from fpdf import FPDF  # type: ignore[import]
 
-from app.services.knowledge_base_service import (
-    get_localized_medicine,
+from app.services.diagnosis.knowledge_base_service import (
+    get_growth_care_recommendations,
     get_localized_treatment_summary,
+    get_treatment_record,
+    normalize_language,
     translate,
 )
 

@@ -9,8 +9,12 @@ from app.api.deps import enforce_rate_limit, get_admin_user
 from app.core.config import settings
 from app.core.database import get_database
 from app.core.errors import ValidationError
-from app.services.model_registry_service import get_active_model, get_registry, upsert_model
-from app.services.prediction_log_service import (
+from app.services.system import (
+    get_active_model,
+    get_registry,
+    upsert_model,
+)
+from app.services.system.prediction_log_service import (
     get_feedback_accuracy_summary,
     get_observability_snapshot,
 )

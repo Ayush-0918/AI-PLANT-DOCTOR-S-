@@ -16,11 +16,18 @@ from app.models.schemas import (
     ScanResponse,
     SoilReportResponse,
 )
-from app.services.ai_inference_service import run_scan_inference, run_soil_inference
-from app.services.knowledge_base_service import get_growth_care_recommendations, get_treatment_record
-from app.services.prediction_log_service import store_feedback
-from app.services.report_service import generate_scan_report
-from app.services.soil_advice_service import build_soil_report_from_ocr, build_soil_report_from_prediction
+from app.services.diagnosis import (
+    generate_scan_report,
+    get_growth_care_recommendations,
+    get_treatment_record,
+    run_scan_inference,
+    run_soil_inference,
+)
+from app.services.soil import (
+    build_soil_report_from_ocr,
+    build_soil_report_from_prediction,
+)
+from app.services.system import store_feedback
 import io
 try:
     from PIL import Image

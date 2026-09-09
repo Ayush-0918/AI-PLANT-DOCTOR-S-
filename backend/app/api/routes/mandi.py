@@ -5,9 +5,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-
-from app.services.mandi_trend_service import mandi_trend_service
-from app.services.dataset_locator_service import (
+from app.services.market import mandi_trend_service
+from app.services.system import (
     AGRICULTURE_PRICE_DATASET_CANDIDATES,
     first_existing_path,
 )

@@ -18,6 +18,9 @@ import {
    Phone,
    Leaf,
    Mountain,
+   FlaskConical,
+   Layers,
+   Sprout,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -131,9 +134,15 @@ export default function ScannerPage() {
       contextualSeverityLabel || (diagnosisConfidence >= 90 ? 'High Severity' : diagnosisConfidence >= 75 ? 'Medium Severity' : 'Early Detection');
    const severityColor = severityLabel === 'High Severity' ? '#fda4af' : severityLabel === 'Medium Severity' ? '#fdba74' : '#6ee7d8';
 
+   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+
    const stopCamera = useCallback(() => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+      if (streamRef.current) {
+         streamRef.current.getTracks().forEach((track) => track.stop());
+         streamRef.current = null;
+      }
+      setCameraStream(null);
       setIsCameraReady(false);
    }, []);
 
@@ -143,28 +152,75 @@ export default function ScannerPage() {
          return;
       }
       stopCamera();
+
+      let stream: MediaStream | null = null;
       try {
-         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+         // Fallback tier 1: requested facing mode with standard HD resolution
+         stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+               facingMode: { ideal: facingMode },
+               width: { ideal: 1280 },
+               height: { ideal: 720 },
+            },
             audio: false,
          });
-         streamRef.current = stream;
-         if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await videoRef.current.play().catch(() => undefined);
-         }
-         setCameraError(null);
-         setIsCameraReady(true);
       } catch {
-         setCameraError('Camera permission blocked. Scan from gallery instead.');
+         try {
+            // Fallback tier 2: opposite facing mode
+            const altFacing = facingMode === 'environment' ? 'user' : 'environment';
+            stream = await navigator.mediaDevices.getUserMedia({
+               video: { facingMode: { ideal: altFacing } },
+               audio: false,
+            });
+         } catch {
+            try {
+               // Fallback tier 3: generic video constraint (laptop webcams, virtual cameras)
+               stream = await navigator.mediaDevices.getUserMedia({
+                  video: true,
+                  audio: false,
+               });
+            } catch (err) {
+               console.error('Camera stream error:', err);
+               setCameraError('Camera permission blocked or device unavailable. Scan from gallery instead.');
+               return;
+            }
+         }
       }
-   }, [stopCamera]);
+
+      if (stream) {
+         streamRef.current = stream;
+         setCameraStream(stream);
+         setCameraError(null);
+      }
+   }, [facingMode, stopCamera]);
 
    useEffect(() => {
-      if (mode !== 'camera') { stopCamera(); return undefined; }
+      if (mode !== 'camera') {
+         stopCamera();
+         return undefined;
+      }
       startCamera();
       return () => stopCamera();
-   }, [mode, startCamera, stopCamera]);
+   }, [mode, facingMode, startCamera, stopCamera]);
+
+   // Reactive binding effect: ensures video element gets srcObject as soon as mounted
+   useEffect(() => {
+      if (mode === 'camera' && cameraStream && videoRef.current) {
+         const video = videoRef.current;
+         video.srcObject = cameraStream;
+         
+         const playPromise = video.play();
+         if (playPromise !== undefined) {
+            playPromise
+               .then(() => setIsCameraReady(true))
+               .catch(() => undefined);
+         }
+      }
+   }, [mode, cameraStream]);
+
+   const toggleFacingMode = () => {
+      setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+   };
 
    useEffect(() => {
       if (mode === 'scanning') {
@@ -311,11 +367,13 @@ export default function ScannerPage() {
 
    return (
       <div
-         className="min-h-screen text-white"
+         className="min-h-screen text-white pb-52 sm:pb-56 relative overflow-hidden"
          style={{
             background: 'radial-gradient(circle at 50% 0%, rgba(30,64,175,0.22) 0%, transparent 40%), linear-gradient(180deg, #070f1c 0%, #0a1426 46%, #081224 100%)',
          }}
       >
+         {/* Background Soft Glow Orbs */}
+         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-tr from-sky-500/15 via-indigo-500/10 to-teal-500/15 blur-3xl pointer-events-none rounded-full" />
 
          {/* ── PIPELINE PROGRESS HEADER ── */}
          <div
@@ -392,81 +450,87 @@ export default function ScannerPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center justify-center min-h-[80vh] px-6 gap-6"
+                  className="flex flex-col items-center justify-center min-h-[65vh] px-6 gap-6 pt-6"
                >
-                  <div className="text-center">
+                  <div className="text-center pt-2">
                      <div
-                        className="h-20 w-20 rounded-3xl flex items-center justify-center mx-auto mb-5"
-                        style={{ background: 'rgba(125,211,252,0.12)', border: '1px solid rgba(125,211,252,0.25)', boxShadow: '0 0 40px rgba(125,211,252,0.15)' }}
+                        className="h-20 w-20 rounded-[1.8rem] flex items-center justify-center mx-auto mb-4 relative backdrop-blur-2xl"
+                        style={{
+                           background: 'linear-gradient(135deg, rgba(125,211,252,0.25), rgba(56,189,248,0.12))',
+                           border: '1px solid rgba(125,211,252,0.4)',
+                           boxShadow: '0 12px 36px rgba(56,189,248,0.25)',
+                        }}
                      >
-                        <ScanLine size={36} className="text-sky-200" />
+                        <ScanLine size={36} className="text-sky-300" />
                      </div>
                      <h2 className="text-3xl font-black text-white tracking-tight">
                         {language === 'हिंदी' || language === 'भोजपुरी' ? 'क्या स्कैन करना है?' : 'What to Scan?'}
                      </h2>
-                     <p className="text-sm text-white/40 mt-2 font-medium">
-                        {language === 'हिंदी' || language === 'भोजपुरी' ? 'पौधा या मिट्टी — एक चुनें' : 'Choose your scan target below'}
+                     <p className="text-sm text-slate-300 dark:text-slate-400 mt-1.5 font-medium">
+                        {language === 'हिंदी' || language === 'भोजपुरी' ? 'अपने खेत के पौधे या मिट्टी का चुनाव करें' : 'Choose your scan target below'}
                      </p>
                   </div>
 
-                  <div className="w-full max-w-sm space-y-4">
+                  <div className="w-full max-w-sm space-y-3.5">
+                     {/* Plant Scan Card */}
                      <motion.button
-                        whileTap={{ scale: 0.97 }}
+                        whileTap={{ scale: 0.96 }}
                         onClick={() => setMode('camera')}
-                        className="w-full rounded-3xl p-6 text-left flex items-center gap-5"
-                        style={{
-                           background: 'linear-gradient(135deg, rgba(110,231,216,0.15), rgba(125,211,252,0.08))',
-                           border: '1.5px solid rgba(110,231,216,0.3)',
-                           boxShadow: '0 8px 32px rgba(110,231,216,0.1)',
-                        }}
+                        className="w-full rounded-[2rem] p-4 sm:p-5 text-left flex items-center gap-3.5 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-br from-emerald-500/15 via-teal-500/8 to-emerald-500/2 border border-emerald-500/30 hover:border-emerald-400/60 shadow-xl shadow-emerald-500/5 group transition-all"
                      >
-                        <div
-                           className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0"
-                           style={{ background: 'rgba(110,231,216,0.2)', border: '1px solid rgba(110,231,216,0.4)' }}
-                        >
-                           <Leaf size={26} className="text-teal-200" />
+                        {/* Soft ambient card glow orb */}
+                        <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/5 blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+
+                        <div className="h-12 w-12 rounded-[1.1rem] bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-400/35 backdrop-blur-xl flex items-center justify-center shrink-0 shadow-inner relative z-10 text-emerald-300 group-hover:scale-105 transition-transform">
+                           <Leaf size={22} className="text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
                         </div>
-                        <div>
-                           <p className="text-lg font-black text-white">
-                              {language === 'हिंदी' || language === 'भोजपुरी' ? '🌿 पौधा स्कैन' : '🌿 Plant Scan'}
-                           </p>
-                           <p className="text-xs text-white/50 mt-0.5">
-                              {language === 'हिंदी' || language === 'भोजपुरी' ? 'पत्ती की बीमारी पहचानें, दवाई पाएं' : 'Detect leaf disease, get medicine & dosage'}
+                        <div className="relative z-10 flex-1 min-w-0">
+                           <div className="flex items-center gap-2 mb-1 flex-wrap sm:flex-nowrap">
+                              <p className="text-base font-black text-white tracking-tight whitespace-nowrap">
+                                 {language === 'हिंदी' || language === 'भोजपुरी' ? '🌿 पौधा स्कैन' : '🌿 Plant Scan'}
+                              </p>
+                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                                 AI Leaf RX
+                              </span>
+                           </div>
+                           <p className="text-xs text-emerald-200/75 font-medium leading-snug">
+                              {language === 'हिंदी' || language === 'भोजपुरी' ? 'पत्ती की बीमारी पहचानें, सटीक दवाई पाएं' : 'Detect leaf disease, get medicine & dosage'}
                            </p>
                         </div>
-                        <ChevronRight size={20} className="text-white/30 ml-auto shrink-0" />
+                        <ChevronRight size={20} className="text-emerald-400/80 shrink-0 relative z-10 ml-auto" />
                      </motion.button>
 
+                     {/* Soil Scan Card */}
                      <motion.button
-                        whileTap={{ scale: 0.97 }}
+                        whileTap={{ scale: 0.96 }}
                         onClick={() => router.push('/soil?scan=1')}
-                        className="w-full rounded-3xl p-6 text-left flex items-center gap-5"
-                        style={{
-                           background: 'linear-gradient(135deg, rgba(180,140,100,0.18), rgba(120,80,40,0.1))',
-                           border: '1.5px solid rgba(180,140,100,0.35)',
-                           boxShadow: '0 8px 32px rgba(180,140,100,0.1)',
-                        }}
+                        className="w-full rounded-[2rem] p-4 sm:p-5 text-left flex items-center gap-3.5 relative overflow-hidden backdrop-blur-2xl bg-gradient-to-br from-amber-500/15 via-orange-500/8 to-amber-500/2 border border-amber-500/30 hover:border-amber-400/60 shadow-xl shadow-amber-500/5 group transition-all"
                      >
-                        <div
-                           className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0"
-                           style={{ background: 'rgba(180,140,100,0.25)', border: '1px solid rgba(180,140,100,0.4)' }}
-                        >
-                           <Mountain size={26} style={{ color: '#d4a26a' }} />
+                        {/* Soft ambient card glow orb */}
+                        <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/5 blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+
+                        <div className="h-12 w-12 rounded-[1.1rem] bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-400/35 backdrop-blur-xl flex items-center justify-center shrink-0 shadow-inner relative z-10 text-amber-300 group-hover:scale-105 transition-transform">
+                           <FlaskConical size={22} className="text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.4)]" />
                         </div>
-                        <div>
-                           <p className="text-lg font-black text-white">
-                              {language === 'हिंदी' || language === 'भोजपुरी' ? '🌍 मिट्टी स्कैन' : '🌍 Soil Scan'}
-                           </p>
-                           <p className="text-xs text-white/50 mt-0.5">
-                              {language === 'हिंदी' || language === 'भोजपुरी' ? 'मिट्टी की फोटो से NPK, pH पहचानें' : 'Upload soil photo to detect type, NPK & pH advice'}
+                        <div className="relative z-10 flex-1 min-w-0">
+                           <div className="flex items-center gap-2 mb-1 flex-wrap sm:flex-nowrap">
+                              <p className="text-base font-black text-white tracking-tight whitespace-nowrap">
+                                 {language === 'हिंदी' || language === 'भोजपुरी' ? '🧪 मिट्टी स्कैन' : '🧪 Soil Scan'}
+                              </p>
+                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                 NPK & pH
+                              </span>
+                           </div>
+                           <p className="text-xs text-amber-200/75 font-medium leading-snug">
+                              {language === 'हिंदी' || language === 'भोजपुरी' ? 'मिट्टी की फोटो से NPK व pH सलाह पाएं' : 'Upload soil photo to detect type, NPK & pH advice'}
                            </p>
                         </div>
-                        <ChevronRight size={20} className="text-white/30 ml-auto shrink-0" />
+                        <ChevronRight size={20} className="text-amber-400/80 shrink-0 relative z-10 ml-auto" />
                      </motion.button>
                   </div>
 
-                  <p className="text-[10px] text-white/25 font-bold uppercase tracking-widest text-center">
-                     {language === 'हिंदी' || language === 'भोजपुरी' ? 'AI द्वारा संचालित • बिल्कुल मुफ्त' : 'Powered by Edge AI • 100% Free'}
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest text-center mt-2">
+                     {language === 'हिंदी' || language === 'भोजपुरी' ? 'AI द्वारा संचालित • 100% मुफ्त' : 'Powered by Edge AI • 100% Free'}
                   </p>
                </motion.div>
             )}
@@ -503,7 +567,20 @@ export default function ScannerPage() {
                         </div>
                      ) : (
                         <>
-                           <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+                           <video
+                              ref={videoRef}
+                              autoPlay
+                              muted
+                              playsInline
+                              onLoadedMetadata={() => {
+                                 if (videoRef.current) {
+                                    videoRef.current.play().catch(() => undefined);
+                                    setIsCameraReady(true);
+                                 }
+                              }}
+                              onCanPlay={() => setIsCameraReady(true)}
+                              className="h-full w-full object-cover"
+                           />
 
                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                               <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 70% 70% at center, transparent 40%, rgba(0,0,0,0.7) 100%)' }} />
@@ -516,41 +593,50 @@ export default function ScannerPage() {
 
                                  {isCameraReady && <div className="scan-line" />}
 
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest text-center px-4">
-                                    {t('scanner_center_leaf')}
-                                    </p>
+                                 <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-lg">
+                                       <p className="text-[10px] font-black text-sky-200 uppercase tracking-widest text-center">
+                                          {t('scanner_center_leaf')}
+                                       </p>
+                                    </div>
                                  </div>
                               </div>
                            </div>
 
                            {isCameraReady && (
-                              <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                 <span className="h-1.5 w-1.5 rounded-full bg-sky-200 animate-pulse" />
-                                 <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">{t('scanner_live_badge')}</span>
+                              <div className="absolute top-4 left-4 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950/60 backdrop-blur-xl border border-emerald-500/30 shadow-lg">
+                                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                                 <span className="text-[10px] font-black text-emerald-300 uppercase tracking-widest">{t('scanner_live_badge')}</span>
                               </div>
                            )}
+
+                           {/* Camera Switch/Flip Button */}
+                           <button
+                              onClick={toggleFacingMode}
+                              className="absolute top-4 right-4 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-950/70 backdrop-blur-xl border border-sky-400/30 text-sky-200 shadow-lg active:scale-95 transition-transform z-20 pointer-events-auto"
+                           >
+                              <RefreshCcw size={12} className="text-sky-300" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">
+                                 {facingMode === 'environment' ? 'Rear Cam 🔄' : 'Front Cam 🔄'}
+                              </span>
+                           </button>
                         </>
                      )}
                   </div>
 
 
                   <div
-                     className="px-5 py-6 flex items-center justify-center gap-6"
-                     style={{
-                        background: 'rgba(8,12,20,0.95)',
-                        backdropFilter: 'blur(20px)',
-                     }}
+                     className="px-6 py-6 flex items-center justify-around gap-4 bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 relative z-20"
                   >
                      {/* Upload from gallery */}
                      <motion.button
                         whileTap={{ scale: 0.88 }}
                         onClick={() => fileInputRef.current?.click()}
-                        className="h-14 w-14 rounded-2xl flex items-center justify-center haptic-btn"
-                        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        className="h-14 w-14 rounded-[1.3rem] bg-white/10 hover:bg-white/15 border border-white/15 backdrop-blur-xl flex flex-col items-center justify-center haptic-btn text-white/80 shadow-lg transition-transform"
                         aria-label="Upload from gallery"
                      >
-                        <ImageIcon size={22} className="text-white/70" />
+                        <ImageIcon size={20} className="text-sky-200" />
+                        <span className="text-[9px] font-bold text-white/60 mt-0.5">Gallery</span>
                      </motion.button>
 
                      <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept="image/*" />
@@ -560,30 +646,27 @@ export default function ScannerPage() {
                         whileTap={{ scale: 0.88 }}
                         onClick={captureFromCamera}
                         disabled={!isCameraReady && !cameraError}
-                        className="relative h-20 w-20 rounded-full flex flex-col items-center justify-center disabled:opacity-40 haptic-btn"
-                        style={{
-                           background: 'linear-gradient(135deg, #dbeafe, #7dd3fc, #6ee7d8)',
-                           boxShadow: '0 0 0 4px rgba(125,211,252,0.2), 0 10px 32px rgba(125,211,252,0.35)',
-                        }}
+                        className="relative h-20 w-20 rounded-full flex flex-col items-center justify-center disabled:opacity-40 haptic-btn p-1 bg-gradient-to-tr from-sky-400 via-teal-300 to-emerald-400 shadow-[0_0_30px_rgba(56,189,248,0.4)]"
                         aria-label="Capture Photo"
                      >
                         <div
-                           className="absolute inset-0 rounded-full animate-ping opacity-20"
-                           style={{ background: '#7dd3fc' }}
+                           className="absolute inset-0 rounded-full animate-ping opacity-25 bg-sky-400 pointer-events-none"
                         />
-                        <Camera size={30} className="text-slate-900 relative z-10" />
-                        <span className="text-[11px] font-bold text-slate-900 mt-1 relative z-10">Capture</span>
+                        <div className="h-full w-full rounded-full bg-gradient-to-br from-sky-200 via-teal-300 to-emerald-300 flex flex-col items-center justify-center text-slate-950 font-black shadow-inner">
+                           <Camera size={26} className="text-slate-950 relative z-10" />
+                           <span className="text-[10px] font-black text-slate-950 tracking-tight uppercase relative z-10 mt-0.5">Capture</span>
+                        </div>
                      </motion.button>
 
                      {/* Stop Camera button */}
                      <motion.button
                         whileTap={{ scale: 0.92 }}
                         onClick={() => setMode('choose')}
-                        className="h-14 w-14 rounded-2xl flex flex-col items-center justify-center haptic-btn border border-rose-400/40 bg-rose-400/10"
+                        className="h-14 w-14 rounded-[1.3rem] bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/30 flex flex-col items-center justify-center haptic-btn backdrop-blur-xl text-rose-300 shadow-lg transition-transform"
                         aria-label="Stop Camera"
                      >
-                        <span className="text-rose-400 font-bold text-lg">✕</span>
-                        <span className="text-[11px] font-bold text-rose-300 mt-0.5">Stop</span>
+                        <span className="text-rose-400 font-bold text-base leading-none">✕</span>
+                        <span className="text-[9px] font-bold text-rose-300 mt-1">Stop</span>
                      </motion.button>
                   </div>
 

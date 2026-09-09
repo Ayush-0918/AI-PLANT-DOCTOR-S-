@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable, Optional
 
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 AGRICULTURE_PRICE_DATASET_CANDIDATES = [
     BACKEND_ROOT / "data" / "generated" / "Agriculture_price_dataset.csv",

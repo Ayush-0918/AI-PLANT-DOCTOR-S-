@@ -224,54 +224,45 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="min-h-full bg-[#f8fafc] pb-36">
+    <div className="min-h-full bg-[#f8fafc] dark:bg-slate-950 pb-36">
 
       {/* ── HEADER ── */}
       <div
-        className="sticky top-0 z-40 px-4 pt-4 pb-3 space-y-3"
-        style={{
-          background: 'rgba(248,250,252,0.9)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-        }}
+        className="sticky top-0 z-40 px-4 pt-4 pb-3 space-y-3 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800 shadow-sm"
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">{t('shop_title')}</h1>
-            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">{t('shop_subtitle')}</p>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{t('shop_title')}</h1>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400 font-semibold mt-0.5">{t('shop_subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/marketplace/sell"
-              className="px-3.5 py-2 rounded-2xl font-black text-xs haptic-btn"
-              style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0' }}
+              className="px-3.5 py-2 rounded-2xl font-black text-xs haptic-btn bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 shadow-sm"
             >
               {t('shop_sell_btn')}
             </Link>
             <Link
               href="/community"
-              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl haptic-btn"
-              style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl haptic-btn bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400"
             >
-              <ShieldCheck size={13} className="text-emerald-600" />
-              <span className="text-xs font-black text-emerald-700">{t('shop_expert_btn')}</span>
+              <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-black text-emerald-700 dark:text-emerald-300">{t('shop_expert_btn')}</span>
             </Link>
           </div>
         </div>
 
         {/* Search */}
         <div
-          className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white"
-          style={{ border: '1px solid rgba(0,0,0,0.07)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+          className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm"
         >
-          <Search size={15} className="text-slate-400 shrink-0" />
+          <Search size={15} className="text-slate-400 dark:text-slate-400 shrink-0" />
           <input
             type="text"
             placeholder={t('shop_search_ph')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none font-medium"
+            className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none font-medium"
           />
           <button
             className="h-7 w-7 rounded-xl flex items-center justify-center bg-slate-100"

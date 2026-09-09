@@ -110,7 +110,7 @@ export default function VoiceAIFAB() {
                 </div>
                 <div>
                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                     {isListening ? 'Listening' : isProcessing ? 'Processing' : 'AI Assistant'}
+                     {isListening ? 'Listening' : isProcessing ? 'Processing' : 'Sahayak • सहायक'}
                    </h4>
                    <p className="text-sm font-bold text-slate-800 tracking-tight">
                      {isListening ? 'Speak now...' : isProcessing ? 'Thinking...' : 'Response Ready'}

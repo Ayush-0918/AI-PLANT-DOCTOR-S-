@@ -40,6 +40,27 @@ class Settings:
     vapi_phone_number_id: str
     vapi_webhook_secret: str
     vapi_url: str
+    group_api_url: str
+    group_api_key: str
+    group_api_timeout: float
+    gemini_api_key: str
+    gemini_model: str
+    bhashini_api_url: str
+    bhashini_api_key: str
+    bhashini_user_id: str
+    sarvam_api_key: str
+    sarvam_model: str
+    sarvam_chat_model: str
+    sarvam_stt_model: str
+    sarvam_speaker: str
+    groq_api_key: str
+    groq_chat_model: str
+    groq_stt_model: str
+    mistral_api_url: str
+    mistral_api_key: str
+    mistral_model: str
+    stt_provider: str
+    tts_provider: str
     static_dir: Path
     model_registry_path: Path
     accuracy_path: Path
@@ -70,6 +91,27 @@ def load_settings() -> Settings:
         vapi_phone_number_id=os.getenv("VAPI_PHONE_NUMBER_ID", ""),
         vapi_webhook_secret=os.getenv("VAPI_WEBHOOK_SECRET", ""),
         vapi_url=os.getenv("VAPI_URL", "https://api.vapi.ai/call"),
+        group_api_url=os.getenv("GROUP_API_URL", ""),
+        group_api_key=os.getenv("GROUP_API_KEY", ""),
+        group_api_timeout=_to_float(os.getenv("GROUP_API_TIMEOUT"), 5.0),
+        gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+        bhashini_api_url=os.getenv("BHASHINI_API_URL", "https://dhruva-api.bhashini.gov.in/services/inference/pipeline"),
+        bhashini_api_key=os.getenv("BHASHINI_API_KEY", ""),
+        bhashini_user_id=os.getenv("BHASHINI_USER_ID", ""),
+        sarvam_api_key=os.getenv("SARVAM_API_KEY", ""),
+        sarvam_model=os.getenv("SARVAM_MODEL", "bulbul:v3"),
+        sarvam_chat_model=os.getenv("SARVAM_CHAT_MODEL", "sarvam-105b"),
+        sarvam_stt_model=os.getenv("SARVAM_STT_MODEL", "saaras:v3"),
+        sarvam_speaker=os.getenv("SARVAM_SPEAKER", "ritu"),
+        groq_api_key=os.getenv("GROQ_API_KEY", ""),
+        groq_chat_model=os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b"),
+        groq_stt_model=os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo"),
+        mistral_api_url=os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1"),
+        mistral_api_key=os.getenv("MISTRAL_API_KEY", ""),
+        mistral_model=os.getenv("MISTRAL_MODEL", "mistral-large-latest"),
+        stt_provider=os.getenv("STT_PROVIDER", "sarvam"),
+        tts_provider=os.getenv("TTS_PROVIDER", "sarvam"),
         static_dir=static_dir,
         model_registry_path=static_dir / "model_registry.json",
         accuracy_path=static_dir / "accuracy.json",
@@ -77,4 +119,7 @@ def load_settings() -> Settings:
     )
 
 
+
+
 settings = load_settings()
+

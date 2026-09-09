@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import enforce_rate_limit
 from app.core.database import get_database
 from app.core.errors import DependencyError, ValidationError
+from app.services.market import fetch_live_weather, ThreatMapService
 
-from app.services.weather_service import fetch_live_weather
+
 
 # Optional: Import cache helpers if redis is available
 try:

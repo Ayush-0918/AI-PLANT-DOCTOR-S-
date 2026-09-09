@@ -11,8 +11,10 @@ TRANSLATION_PATH = GENERATED_DIR / "translations_core.csv"
 CROP_RECOMMENDATION_PATH = GENERATED_DIR / "crop_recommendation.csv"
 FERTILIZER_RECOMMENDATION_PATH = GENERATED_DIR / "fertilizer_recommendation.csv"
 GROWTH_CARE_PATH = GENERATED_DIR / "plant_growth_care_recommendations.csv"
-MODEL_PATH = PROJECT_ROOT / "backend" / "app" / "plantvillage_model.pth"
+MODEL_PATH = PROJECT_ROOT / "backend" / "data" / "models" / "plantvillage_model.pth"
 FIELD_REPORT_PATH = PROJECT_ROOT / "backend" / "static" / "field_validation_report.json"
+
+
 
 
 def _csv_row_count(path: Path) -> int:

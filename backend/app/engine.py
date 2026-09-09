@@ -4,10 +4,10 @@ from typing import Optional
 
 import numpy as np  # type: ignore[import]
 import pandas as pd  # type: ignore[import]
-from fastapi import APIRouter  # type: ignore[import]
-
-from app.services.dataset_locator_service import (
+from fastapi import APIRouter
+from app.services.system import (
     AGRICULTURE_PRICE_DATASET_CANDIDATES,
+
     CROP_RECOMMENDATION_CANDIDATES,
     FERTILIZER_RECOMMENDATION_CANDIDATES,
     first_existing_path,

@@ -30,7 +30,7 @@ export default function BottomNav() {
     >
       <div className="pointer-events-auto max-w-md mx-auto">
         <nav
-          className="relative rounded-[32px] px-2 py-2.5 bg-white/90 backdrop-blur-2xl border border-slate-200/60 shadow-[0_4px_32px_rgba(0,0,0,0.1)]"
+          className="relative rounded-[32px] px-2 py-2.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200/60 dark:border-slate-800 shadow-[0_4px_32px_rgba(0,0,0,0.2)]"
         >
           <motion.div
             className="absolute inset-0 rounded-[28px] pointer-events-none"
@@ -55,7 +55,7 @@ export default function BottomNav() {
                   {isActive && (
                     <motion.div
                       layoutId="nav-active-pill"
-                      className="absolute inset-0 rounded-[20px] bg-slate-50 border border-slate-100"
+                      className="absolute inset-0 rounded-[20px] bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/60"
                       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     />
                   )}
@@ -79,8 +79,8 @@ export default function BottomNav() {
                   </div>
 
                   <span
-                    className={`mt-1 text-[8px] font-black uppercase tracking-widest transition-opacity ${isActive ? 'opacity-100' : 'opacity-40'}`}
-                    style={{ color: isActive ? item.color : '#64748b' }}
+                    className={`mt-1 text-[8.5px] font-extrabold uppercase tracking-widest transition-all ${isActive ? 'opacity-100' : 'opacity-85 dark:opacity-90'}`}
+                    style={{ color: isActive ? item.color : '#475569' }}
                   >
                     {t(item.name)}
                   </span>

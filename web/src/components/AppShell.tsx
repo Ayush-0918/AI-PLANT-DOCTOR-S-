@@ -21,8 +21,11 @@ export default function AppShell({
   const { t } = useLanguage();
   const isMarketing = pathname === '/';
   const showChrome = isHydrated && profile.onboardingCompleted;
-  const hideNav = pathname === '/admin' || pathname === '/scanner';
+  const isAssistant = pathname === '/assistant';
+  const hideNav = pathname === '/admin' || pathname === '/scanner' || isAssistant;
   const hideWidget = pathname.startsWith('/community') || pathname === '/scanner' || pathname.startsWith('/marketplace') || pathname === '/profile';
+
+  const showHeader = showChrome && !isAssistant && pathname !== '/scanner';
 
   if (isMarketing) {
     return <div className="relative min-h-screen">{children}</div>;
@@ -36,40 +39,27 @@ export default function AppShell({
         <div className="phone-status-bar hidden lg:flex h-6" />
 
         <div className="absolute inset-0 z-0 pointer-events-none">
-          {/* Base light gradient */}
+          {/* Base light gradient with Soft Peachy Delight & Pastel Bliss undertones */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 dark:hidden"
             style={{
-              background: 'linear-gradient(150deg, #f8fafc 0%, #ffffff 42%, #f1f5f9 76%, #ffffff 100%)',
+              background:
+                'radial-gradient(ellipse 85% 65% at 90% 2%, rgba(254, 215, 170, 0.65) 0%, transparent 68%), radial-gradient(ellipse 75% 55% at 8% 30%, rgba(209, 250, 229, 0.58) 0%, transparent 68%), radial-gradient(ellipse 80% 60% at 88% 72%, rgba(254, 205, 211, 0.52) 0%, transparent 68%), radial-gradient(ellipse 65% 50% at 15% 85%, rgba(233, 213, 255, 0.48) 0%, transparent 68%), linear-gradient(170deg, #fdf6f0 0%, #fbf6ff 38%, #f0fdf4 75%, #f8fafc 100%)',
             }}
           />
 
-          {/* Atmospheric blobs */}
+          {/* Base dark gradient - rich slate obsidian with glowing ambient mesh */}
           <div
-            className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full opacity-30"
+            className="absolute inset-0 hidden dark:block"
             style={{
-              background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)',
-              filter: 'blur(60px)',
-            }}
-          />
-          <div
-            className="absolute top-[30%] -right-[20%] w-[60vw] h-[60vw] rounded-full opacity-20"
-            style={{
-              background: 'radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%)',
-              filter: 'blur(80px)',
-            }}
-          />
-          <div
-            className="absolute -bottom-[10%] left-[30%] w-[50vw] h-[50vw] rounded-full opacity-20"
-            style={{
-              background: 'radial-gradient(circle, rgba(14,165,233,0.1) 0%, transparent 70%)',
-              filter: 'blur(100px)',
+              background:
+                'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16, 185, 129, 0.16) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 90% 40%, rgba(14, 165, 233, 0.12) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 10% 80%, rgba(245, 158, 11, 0.1) 0%, transparent 60%), linear-gradient(180deg, #0b1322 0%, #080e1a 50%, #050a14 100%)',
             }}
           />
 
           {/* Noise texture overlay */}
           <div
-            className="absolute inset-0 opacity-[0.02]"
+            className="absolute inset-0 opacity-[0.025]"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
               backgroundRepeat: 'repeat',
@@ -80,10 +70,10 @@ export default function AppShell({
 
         <div className="mobile-content hide-scrollbar">
           {/* ── TOP HEADER ── */}
-          {showChrome && <ModernHeader />}
+          {showHeader && <ModernHeader />}
 
         {/* ── MAIN CONTENT ── */}
-        <main className={`relative z-10 flex-1 overflow-y-auto hide-scrollbar ${showChrome && !hideNav ? 'pb-[110px]' : ''}`}>
+        <main className={`relative z-10 flex-1 min-h-0 flex flex-col ${isAssistant ? 'overflow-hidden' : 'overflow-y-auto hide-scrollbar'} ${showChrome && !hideNav && !isAssistant ? 'pb-[110px]' : ''}`}>
           {children}
 
           {showChrome && !hideNav && (

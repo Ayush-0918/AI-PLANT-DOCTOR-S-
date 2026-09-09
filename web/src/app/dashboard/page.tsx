@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Activity,
   BarChart3,
   AlertTriangle,
   ArrowUpRight,
@@ -9,14 +10,19 @@ import {
   Camera,
   Cloud,
   Droplets,
+  Headset,
   Leaf,
   Map,
   MapPin,
+  PhoneCall,
+  Minus,
   Plus,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
   Sun,
   TrendingDown,
+  TrendingUp,
   Users,
   Wind,
   Zap,
@@ -28,6 +34,8 @@ import { useFarmerProfile } from '@/context/FarmerProfileContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatSoilTypeLabel, normalizeSoilType } from '@/lib/soil';
 import WealthPredictor from '@/components/WealthPredictor';
+import FarmerAssistantCard from '@/components/farmer/FarmerAssistantCard';
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -109,7 +117,7 @@ const cropTranslations: Record<string, Record<string, string>> = {
 
 export default function DashboardPage() {
   const { profile, updateProfile } = useFarmerProfile();
-  const { setHealthScore } = useAtmosphere();
+  const { setHealthScore, isDark } = useAtmosphere();
   const { language, t } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState(() =>
@@ -567,11 +575,11 @@ export default function DashboardPage() {
   }, [isEnglish, roiData, soilTypeLabel]);
 
   const toolCards = [
-    { href: '/mandi', icon: BarChart3, label: T.marketIntel as string, sub: T.live as string, color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
-    { href: '/soil', icon: Map, label: T.soilHealth as string, sub: T.soilSub as string, color: '#fdba74', bg: 'rgba(253,186,116,0.12)' },
-    { href: '/calendar', icon: Droplets, label: T.fertPlan as string, sub: T.fertSub as string, color: '#7dd3fc', bg: 'rgba(125,211,252,0.12)' },
-    { href: '/marketplace', icon: ShoppingBag, label: T.agriStore as string, sub: T.agriSub as string, color: '#c4b5fd', bg: 'rgba(196,181,253,0.12)' },
-    { href: '/community', icon: Users, label: T.farmerNet as string, sub: T.farmerSub as string, color: '#fda4af', bg: 'rgba(253,164,175,0.12)' },
+    { href: '/mandi', icon: BarChart3, label: T.marketIntel as string, sub: T.live as string, gradient: 'from-emerald-400 to-teal-500', shadow: 'rgba(16,185,129,0.3)' },
+    { href: '/soil', icon: Map, label: T.soilHealth as string, sub: T.soilSub as string, gradient: 'from-amber-400 to-orange-500', shadow: 'rgba(245,158,11,0.3)' },
+    { href: '/calendar', icon: Droplets, label: T.fertPlan as string, sub: T.fertSub as string, gradient: 'from-sky-400 to-blue-500', shadow: 'rgba(14,165,233,0.3)' },
+    { href: '/marketplace', icon: ShoppingBag, label: T.agriStore as string, sub: T.agriSub as string, gradient: 'from-indigo-400 to-purple-500', shadow: 'rgba(99,102,241,0.3)' },
+    { href: '/community', icon: Users, label: T.farmerNet as string, sub: T.farmerSub as string, gradient: 'from-rose-400 to-pink-500', shadow: 'rgba(244,63,94,0.3)' },
   ];
 
   if (!mounted) {
@@ -579,7 +587,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-full space-y-5 px-4 pb-32 pt-5 bg-[#f8fafc] text-slate-800">
+    <div
+      className="min-h-full space-y-5 px-4 pb-32 pt-5 text-slate-800 dark:text-slate-100 relative"
+      style={{
+        background: isDark
+          ? 'transparent'
+          : 'radial-gradient(ellipse 90% 45% at 85% -5%, rgba(254, 215, 170, 0.45) 0%, transparent 70%), radial-gradient(ellipse 75% 55% at 10% 35%, rgba(209, 250, 229, 0.42) 0%, transparent 70%), radial-gradient(ellipse 85% 50% at 90% 75%, rgba(254, 205, 211, 0.35) 0%, transparent 70%), linear-gradient(180deg, rgba(253, 246, 240, 0.6) 0%, transparent 350px)'
+      }}
+    >
 
       {/* ── Greeting row ─────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
@@ -617,16 +632,14 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_8px_30px_rgb(0,0,0,0.08)]"
+            className="rounded-2xl p-3 overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/60 dark:border-slate-800 shadow-xl"
           >
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 {isEnglish ? 'Live Notifications' : 'लाइव नोटिफिकेशन'}
               </p>
-              <button
-                onClick={() => setIsNotificationsOpen(false)}
-                className="text-[10px] font-bold text-slate-400"
-              >
+              <button onClick={() => setIsNotificationsOpen(false)}
+                className="text-[10px] font-bold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                 {isEnglish ? 'Close' : 'बंद करें'}
               </button>
             </div>
@@ -634,24 +647,16 @@ export default function DashboardPage() {
               {alerts.map((item, index) => (
                 <div
                   key={`${item.type}-${index}`}
-                  className="rounded-xl border px-3 py-2.5"
-                  style={{
-                    borderColor:
-                      item.priority === 'high'
-                        ? 'rgba(244,63,94,0.28)'
-                        : item.priority === 'medium'
-                          ? 'rgba(245,158,11,0.25)'
-                          : 'rgba(148,163,184,0.25)',
-                    background:
-                      item.priority === 'high'
-                        ? 'rgba(255,241,242,0.8)'
-                        : item.priority === 'medium'
-                          ? 'rgba(255,251,235,0.85)'
-                          : 'rgba(248,250,252,0.8)',
-                  }}
+                  className={`rounded-xl border px-3 py-2.5 transition-colors ${
+                    item.priority === 'high'
+                      ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/90 dark:bg-rose-950/40 text-rose-950 dark:text-rose-100'
+                      : item.priority === 'medium'
+                        ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100'
+                  }`}
                 >
-                  <p className="text-[11px] font-black text-slate-800">{item.title}</p>
-                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">{item.message}</p>
+                  <p className="text-[11px] font-black">{item.title}</p>
+                  <p className="mt-0.5 text-[11px] font-medium opacity-80">{item.message}</p>
                 </div>
               ))}
             </div>
@@ -659,47 +664,92 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Health Score + Copilot card ───────────────────────── */}
-      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.5 }}
-        className="relative overflow-hidden rounded-[2rem] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-900/5 bg-white">
+      {/* ── Multilingual Farmer Voice Assistant & Chatbot Card (v2) ── */}
+      <FarmerAssistantCard />
+
+
+      {/* ── Health Score + Copilot card (Soft Glass Prism) ───────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.06, duration: 0.5 }}
+        className="relative overflow-hidden rounded-[2.25rem] p-5 shadow-[0_12px_40px_rgba(16,185,129,0.12)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.5)] prism-ring bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-emerald-100/50 dark:from-slate-900/90 dark:via-emerald-950/40 dark:to-teal-950/30 backdrop-blur-2xl border border-emerald-200/70 dark:border-emerald-800/60 text-slate-800 dark:text-slate-100 transition-all"
+      >
+        {/* Ambient emerald & mint Orbs */}
+        <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-emerald-400/20 dark:bg-emerald-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-8 -bottom-8 h-40 w-40 rounded-full bg-teal-400/15 dark:bg-teal-500/15 blur-3xl" />
 
         {/* Top row: badge + time */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="relative z-10 flex items-center justify-between mb-3.5">
           <div className="flex items-center gap-2">
-            <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            <div className="rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 border border-emerald-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300 backdrop-blur-md">
               {T.copilot as string}
             </div>
+            <div className="flex items-center gap-1 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Live</span>
+            </div>
           </div>
-          <span className="text-xs font-semibold text-slate-400" suppressHydrationWarning>{time}</span>
+          <span className="text-xs font-semibold text-slate-400 dark:text-slate-400" suppressHydrationWarning>{time}</span>
         </div>
 
-        {/* Main content: text + leaf icon */}
-        <div className="flex items-start justify-between gap-3">
+        {/* Main content: text + leaf icon orb */}
+        <div className="relative z-10 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-black leading-tight text-slate-800 text-balance">
+            <h2 className="text-xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-800 dark:from-white dark:via-emerald-200 dark:to-slate-100 bg-clip-text text-transparent">
               {T.tagline as string}
-              <span className="block text-slate-500 font-bold text-base mt-0.5">{t('field_walk')}</span>
+              <span className="block text-slate-500 dark:text-slate-400 font-bold text-base mt-0.5">{t('field_walk')}</span>
             </h2>
-            <p className="mt-2.5 text-[13px] leading-relaxed text-slate-500 font-medium text-pretty pl-[1px]">
+            <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300 font-medium">
               {T.subtitle as string}
             </p>
           </div>
-          <div className="flex-shrink-0 flex h-12 w-12 items-center justify-center rounded-[1.2rem] bg-emerald-50">
-            <Leaf size={22} className="text-emerald-500" />
+          <div className="flex-shrink-0 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] border border-white/40">
+            <Leaf size={20} className="drop-shadow-sm animate-pulse" />
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
+        {/* Stats row with soft pastel glass cards */}
+        <div className="relative z-10 mt-4 grid grid-cols-3 gap-2.5">
           {[
-            { label: T.farmHealth as string, value: '88%', tone: 'emerald', icon: '🌾' },
-            { label: T.activeFields as string, value: `${cropList.length}`, tone: 'sky', icon: '📍' },
-            { label: T.watchAlerts as string, value: `${alerts.length}`, tone: 'amber', icon: '⚠️' },
+            {
+              label: T.farmHealth as string,
+              value: '88%',
+              icon: '🌾',
+              cardStyle: 'bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-emerald-100/70 dark:from-emerald-950/40 dark:via-slate-900/80 dark:to-teal-950/40 border-emerald-200/70 dark:border-emerald-800/60 shadow-[0_4px_16px_rgba(16,185,129,0.08)]',
+              valColor: 'text-emerald-950 dark:text-emerald-100',
+              iconBg: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40 dark:border-emerald-700/40',
+            },
+            {
+              label: T.activeFields as string,
+              value: `${cropList.length}`,
+              icon: '📍',
+              cardStyle: 'bg-gradient-to-br from-sky-50/90 via-cyan-50/60 to-blue-50/70 dark:from-sky-950/40 dark:via-slate-900/80 dark:to-blue-950/40 border-sky-200/70 dark:border-sky-800/60 shadow-[0_4px_16px_rgba(14,165,233,0.08)]',
+              valColor: 'text-sky-950 dark:text-sky-100',
+              iconBg: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40',
+            },
+            {
+              label: T.watchAlerts as string,
+              value: `${alerts.length}`,
+              icon: '⚠️',
+              cardStyle: 'bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-yellow-50/70 dark:from-amber-950/40 dark:via-slate-900/80 dark:to-orange-950/40 border-amber-200/70 dark:border-amber-800/60 shadow-[0_4px_16px_rgba(245,158,11,0.08)]',
+              valColor: 'text-amber-950 dark:text-amber-100',
+              iconBg: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-300/40 dark:border-amber-700/40',
+            },
           ].map((item) => (
-            <div key={item.label} className="rounded-2xl p-3 bg-slate-50 border border-slate-100">
-              <p className="text-xs">{item.icon}</p>
-              <p className="mt-1.5 text-lg font-black text-slate-800 leading-none">{item.value}</p>
-              <p className="mt-1 text-[9px] font-bold text-slate-400 leading-snug break-words" style={{ wordBreak: 'break-word', lineHeight: '1.3' }}>{item.label}</p>
+            <div
+              key={item.label}
+              className={`rounded-2xl p-2.5 backdrop-blur-md border ${item.cardStyle} transition-all hover:scale-[1.02] shadow-sm flex flex-col justify-between`}
+            >
+              <div className="flex items-center gap-1.5">
+                <div className={`h-6 w-6 rounded-lg ${item.iconBg} flex items-center justify-center shrink-0 text-xs`}>
+                  {item.icon}
+                </div>
+                <span className="text-[9px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis">
+                  {item.label}
+                </span>
+              </div>
+              <p className={`mt-2 text-base font-extrabold leading-none ${item.valColor}`}>{item.value}</p>
             </div>
           ))}
         </div>
@@ -707,124 +757,206 @@ export default function DashboardPage() {
 
       {/* ── Quick Scan CTA — prominent green card ─────────────── */}
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1, duration: 0.5 }}
-        className="relative overflow-hidden rounded-[2rem] p-5 shadow-[0_12px_40px_rgb(16,185,129,0.15)]"
-        style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md">
+        className="relative overflow-hidden rounded-[2rem] p-5 glass-shine-sweep scan-cta-premium">
+        {/* Decorative leaf silhouette */}
+        <div className="pointer-events-none absolute -right-4 -bottom-4 opacity-[0.08]">
+          <Leaf size={120} className="text-white" />
+        </div>
+        <div className="relative z-10 flex items-center gap-2 mb-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/20">
             <ShieldCheck size={16} className="text-white" />
           </div>
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">{T.aiDiag as string}</span>
         </div>
-        <h2 className="text-[1.15rem] font-black leading-tight text-white mb-2">{T.scanHeadline as string}</h2>
-        <p className="text-xs text-emerald-50 leading-relaxed font-medium mb-5">{T.scanSub as string}</p>
+        <h2 className="relative z-10 text-[1.15rem] font-black leading-tight text-white mb-2">{T.scanHeadline as string}</h2>
+        <p className="relative z-10 text-xs text-emerald-50/90 leading-relaxed font-medium mb-5">{T.scanSub as string}</p>
         <Link href="/scanner"
-          className="flex w-full items-center justify-center gap-2.5 rounded-2xl py-3.5 text-sm font-black text-emerald-900 bg-white shadow-lg active:scale-95 transition-transform">
+          className="relative z-10 flex w-full items-center justify-center gap-2.5 rounded-2xl py-3.5 text-sm font-black text-emerald-900 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.18)] active:scale-95 transition-transform hover:bg-emerald-50">
           <Camera size={18} />
           {T.takePic as string}
           <ArrowUpRight size={16} />
         </Link>
       </motion.div>
 
-      {/* ── Crop pills ────────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14, duration: 0.5 }}
-        className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+      {/* ── Crop Selector Bar (Refined Soft Glass Prism) ────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.14, duration: 0.45 }}
+        className="flex gap-3 overflow-x-auto hide-scrollbar py-2 px-1 items-center"
+      >
         {cropList.map((crop, idx) => {
           const localName = cropTranslations[language]?.[crop] ?? crop;
           const isActive = crop === activeCrop;
           return (
-            <motion.button key={idx} whileTap={{ scale: 0.92 }}
+            <motion.button
+              key={idx}
+              whileTap={{ scale: 0.94 }}
+              animate={isActive ? { scale: 1.05 } : { scale: 1 }}
+              transition={{ duration: 0.2 }}
               onClick={() => {
-                if (navigator.vibrate) navigator.vibrate(10);
+                if (navigator.vibrate) navigator.vibrate(8);
                 updateProfile({ activeCrop: crop });
               }}
-              className="group flex shrink-0 cursor-pointer flex-col items-center gap-2">
+              className="group flex shrink-0 cursor-pointer flex-col items-center gap-1.5 select-none"
+            >
               <div
-                className="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl bg-white shadow-sm transition-all"
-                style={{
-                  outline: isActive ? '2px solid #10b981' : '1px solid rgba(0,0,0,0.05)',
-                  boxShadow: isActive
-                    ? '0 0 0 2.5px #10b981, 0 4px 12px rgba(16,185,129,0.25)'
-                    : '0 1px 4px rgba(0,0,0,0.06)',
-                }}
+                className={`relative flex h-13 w-13 items-center justify-center rounded-[1.25rem] text-xl transition-all duration-300 backdrop-blur-xl ${
+                  isActive
+                    ? 'bg-emerald-500/15 dark:bg-emerald-500/25 border-2 border-emerald-500/80 dark:border-emerald-400/80 shadow-[0_6px_20px_rgba(16,185,129,0.22)] text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/20'
+                    : 'bg-white/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 shadow-sm hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                }`}
               >
-                {cropIcons[crop] || cropIcons.Default}
+                {isActive && (
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 shadow-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                  </span>
+                )}
+                <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                  {cropIcons[crop] || cropIcons.Default}
+                </span>
               </div>
               <span
-                className="text-[10px] font-bold uppercase tracking-[0.16em] transition-colors"
-                style={{ color: isActive ? '#059669' : '#64748b' }}
-              >{localName}</span>
+                className={`text-[11px] font-bold tracking-tight capitalize transition-colors ${
+                  isActive ? 'text-emerald-700 dark:text-emerald-400 font-extrabold' : 'text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                {localName}
+              </span>
             </motion.button>
           );
         })}
-        <motion.div whileTap={{ scale: 0.92 }} className="flex shrink-0 cursor-pointer flex-col items-center gap-2 opacity-75">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50">
-            <Plus size={20} className="text-slate-400" />
+        <motion.div
+          whileTap={{ scale: 0.94 }}
+          className="flex shrink-0 cursor-pointer flex-col items-center gap-1.5 group select-none"
+        >
+          <div className="flex h-13 w-13 items-center justify-center rounded-[1.25rem] border-2 border-dashed border-emerald-400/40 dark:border-emerald-600/40 bg-emerald-50/50 dark:bg-emerald-950/20 backdrop-blur-md hover:border-emerald-500 hover:bg-emerald-500/10 transition-colors shadow-sm">
+            <Plus size={18} className="text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{t('add') || 'Add'}</span>
+          <span className="text-[11px] font-bold capitalize text-slate-400 dark:text-slate-500">{t('add') || 'Add'}</span>
         </motion.div>
       </motion.div>
 
-      {/* ── Weather card — LIVE API ───────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, duration: 0.5 }}
-        className="overflow-hidden rounded-[2rem] bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-900/5">
-        <div className="p-5">
-          {/* Header row: label + city only */}
-          <div className="mb-1.5 flex items-center gap-2">
-            <Sun size={15} className="text-amber-500" />
-            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">{T.weather as string}</span>
-            {weather && (
-              <span className="text-[9px] font-bold text-slate-400 ml-1">• {weather.city}</span>
-            )}
+      {/* ── Weather Card (Ultra-Clean Soft Glass Prism) ────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18, duration: 0.5 }}
+        className="relative overflow-hidden rounded-[2.25rem] p-5 shadow-[0_12px_40px_rgba(14,165,233,0.12)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.5)] prism-ring bg-gradient-to-br from-white/90 via-sky-50/70 to-indigo-50/60 dark:from-slate-900/90 dark:via-sky-950/40 dark:to-indigo-950/30 backdrop-blur-2xl border border-sky-200/60 dark:border-sky-800/50 text-slate-800 dark:text-slate-100 transition-all"
+      >
+        {/* Ambient atmospheric Orbs */}
+        <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-amber-400/20 dark:bg-amber-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-8 -bottom-8 h-36 w-36 rounded-full bg-sky-400/15 dark:bg-sky-500/15 blur-3xl" />
+
+        <div className="relative z-10">
+          {/* Header Row */}
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-400 text-white shadow-[0_4px_16px_rgba(251,191,36,0.35)] border border-white/40">
+                <Sun size={18} className="drop-shadow-sm" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400 block">
+                  {T.weather as string}
+                </span>
+                {weather && (
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    {weather.city}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-full bg-sky-500/10 dark:bg-sky-400/10 border border-sky-500/20 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:text-sky-300 backdrop-blur-md">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+              <span>Live</span>
+            </div>
           </div>
 
-          {/* Temperature + description */}
+          {/* Temperature + Description Hero Block */}
           {weatherLoading ? (
-            <div className="space-y-2 mb-3">
-              <div className="h-10 w-28 rounded-xl bg-slate-100 animate-pulse" />
-              <div className="h-4 w-40 rounded-lg bg-slate-100 animate-pulse" />
+            <div className="space-y-2 mb-4">
+              <div className="h-10 w-28 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 animate-pulse" />
+              <div className="h-4 w-40 rounded-lg bg-slate-200/60 dark:bg-slate-800/60 animate-pulse" />
             </div>
           ) : (
-            <>
-              <p className="text-4xl font-black tracking-tighter text-slate-900">
+            <div className="mb-3.5">
+              <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-sky-900 to-slate-800 dark:from-white dark:via-sky-200 dark:to-slate-100 bg-clip-text text-transparent leading-none">
                 {weather?.temperature || '28°C'}
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {weather?.description || (T.sunny as string)}
               </p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-500 mb-3">
-                {weather?.description || T.sunny as string}
-              </p>
-            </>
+            </div>
           )}
 
-          {/* Alert badge — BELOW temperature, full width, no overlap */}
+          {/* Alert Badge */}
           {!weatherLoading && (
-            <div className="mb-3">
+            <div className="mb-4">
               {weather?.weather_alerts?.[0] ? (
-                <div className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 border border-amber-100">
+                <div className="flex items-start gap-2 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 px-3 py-2 border border-amber-500/20 backdrop-blur-md">
                   <span className="text-sm shrink-0">⚠️</span>
-                  <span className="text-[11px] font-bold text-amber-800 leading-snug">{weather.weather_alerts[0]}</span>
+                  <span className="text-[11px] font-bold text-amber-800 dark:text-amber-200 leading-snug">
+                    {weather.weather_alerts[0]}
+                  </span>
                 </div>
               ) : (
-                <div className="inline-flex rounded-full bg-amber-50 px-3 py-1.5 border border-amber-100">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">{T.rustRisk as string}</span>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 dark:bg-amber-400/10 px-3 py-1 border border-amber-500/25 backdrop-blur-md">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-300">
+                    {T.rustRisk as string}
+                  </span>
                 </div>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+          {/* 3 Stat Cards Row with Soft Glass Prism Coloring */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
             {[
-              { icon: Wind, label: T.wind as string, value: weatherLoading ? '—' : (weather?.wind_speed || '12 km/h'), color: '#64748b' },
-              { icon: Droplets, label: T.humidity as string, value: weatherLoading ? '—' : (weather?.humidity || '68%'), color: '#0ea5e9' },
-              { icon: Cloud, label: T.tomorrow as string, value: T.lightRain as string, color: '#8b5cf6' },
-            ].map(({ icon: Icon, label, value, color }) => (
-              <div key={label} className="rounded-2xl bg-slate-50 border border-slate-100 p-3">
-                <div className="flex items-center gap-1.5">
-                  <Icon size={12} style={{ color }} />
-                  <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</span>
+              {
+                icon: Wind,
+                label: T.wind as string,
+                value: weatherLoading ? '—' : (weather?.wind_speed || '12 km/h'),
+                cardBg: 'bg-gradient-to-br from-teal-50/90 via-emerald-50/60 to-cyan-50/70 dark:from-teal-950/40 dark:via-slate-900/80 dark:to-cyan-950/40 border-teal-200/60 dark:border-teal-800/60 shadow-[0_4px_16px_rgba(20,184,166,0.08)]',
+                iconBg: 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-300/40 dark:border-teal-700/40',
+                valColor: 'text-teal-950 dark:text-teal-100',
+              },
+              {
+                icon: Droplets,
+                label: T.humidity as string,
+                value: weatherLoading ? '—' : (weather?.humidity || '68%'),
+                cardBg: 'bg-gradient-to-br from-sky-50/90 via-cyan-50/60 to-blue-50/70 dark:from-sky-950/40 dark:via-slate-900/80 dark:to-blue-950/40 border-sky-200/60 dark:border-sky-800/60 shadow-[0_4px_16px_rgba(14,165,233,0.08)]',
+                iconBg: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-700/40',
+                valColor: 'text-sky-950 dark:text-sky-100',
+              },
+              {
+                icon: Cloud,
+                label: T.tomorrow as string,
+                value: T.lightRain as string,
+                cardBg: 'bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-violet-50/70 dark:from-indigo-950/40 dark:via-slate-900/80 dark:to-violet-950/40 border-indigo-200/60 dark:border-indigo-800/60 shadow-[0_4px_16px_rgba(99,102,241,0.08)]',
+                iconBg: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/40',
+                valColor: 'text-indigo-950 dark:text-indigo-100',
+              },
+            ].map(({ icon: Icon, label, value, cardBg, iconBg, valColor }) => (
+              <div
+                key={label}
+                className={`rounded-2xl ${cardBg} border p-2.5 backdrop-blur-md transition-all hover:scale-[1.02] shadow-sm flex flex-col justify-between`}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className={`h-6 w-6 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
+                    <Icon size={13} />
+                  </div>
+                  <span className="text-[9px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis">
+                    {label}
+                  </span>
                 </div>
                 {weatherLoading ? (
-                  <div className="mt-2 h-4 w-14 rounded bg-slate-200 animate-pulse" />
+                  <div className="mt-2 h-4 w-12 rounded bg-slate-200/60 dark:bg-slate-700/60 animate-pulse" />
                 ) : (
-                  <p className="mt-2 text-sm font-bold text-slate-700">{value}</p>
+                  <p className={`mt-2 text-xs font-black leading-tight ${valColor} truncate`}>
+                    {value}
+                  </p>
                 )}
               </div>
             ))}
@@ -862,27 +994,78 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* ── Alerts ───────────────────────────────────────────── */}
+      {/* ── Alerts (Soft Glass Prism & Category Orbs) ───────────────────────────── */}
       <AnimatePresence>
-        {alerts.map((alert, index) => (
-          <motion.div key={alert.title} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.22 + index * 0.06 }}
-            className="rounded-2xl border bg-white shadow-[0_4px_12px_rgb(0,0,0,0.02)] px-4 py-3"
-            style={{
-              borderColor: alert.priority === 'high' ? 'rgba(244,63,94,0.2)' : 'rgba(245,158,11,0.2)',
-            }}>
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl shrink-0"
-                style={{ background: alert.priority === 'high' ? 'rgba(255,228,230,1)' : 'rgba(254,243,199,1)' }}>
-                <AlertTriangle size={14} className={alert.priority === 'high' ? 'text-rose-500' : 'text-amber-500'} />
+        {alerts.map((alert, index) => {
+          const isHigh = alert.priority === 'high' || alert.type === 'disease';
+          const isMedium = alert.priority === 'medium' || alert.type === 'weather';
+          const isMarket = alert.type === 'market';
+
+          const cardStyle = isHigh
+            ? 'bg-gradient-to-br from-rose-50/90 via-red-50/60 to-orange-50/70 dark:from-rose-950/50 dark:via-slate-900/90 dark:to-red-950/40 border-rose-200/70 dark:border-rose-800/60 text-rose-950 dark:text-rose-100 shadow-[0_4px_20px_rgba(244,63,94,0.08)]'
+            : isMedium
+            ? 'bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-yellow-50/70 dark:from-amber-950/50 dark:via-slate-900/90 dark:to-orange-950/40 border-amber-200/70 dark:border-amber-800/60 text-amber-950 dark:text-amber-100 shadow-[0_4px_20px_rgba(245,158,11,0.08)]'
+            : isMarket
+            ? 'bg-gradient-to-br from-sky-50/90 via-cyan-50/60 to-blue-50/70 dark:from-sky-950/50 dark:via-slate-900/90 dark:to-blue-950/40 border-sky-200/70 dark:border-sky-800/60 text-sky-950 dark:text-sky-100 shadow-[0_4px_20px_rgba(14,165,233,0.08)]'
+            : 'bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-violet-50/70 dark:from-indigo-950/50 dark:via-slate-900/90 dark:to-purple-950/40 border-indigo-200/70 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.08)]';
+
+          const iconContainerStyle = isHigh
+            ? 'bg-gradient-to-tr from-rose-500 to-red-500 text-white shadow-[0_4px_14px_rgba(244,63,94,0.35)] border border-white/30'
+            : isMedium
+            ? 'bg-gradient-to-tr from-amber-400 to-orange-500 text-white shadow-[0_4px_14px_rgba(245,158,11,0.35)] border border-white/30'
+            : isMarket
+            ? 'bg-gradient-to-tr from-sky-400 to-blue-500 text-white shadow-[0_4px_14px_rgba(14,165,233,0.35)] border border-white/30'
+            : 'bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] border border-white/30';
+
+          const badgeLabel = isHigh
+            ? 'HIGH RISK'
+            : isMedium
+            ? 'WEATHER'
+            : isMarket
+            ? 'MARKET'
+            : 'PREMIUM';
+
+          const badgeStyle = isHigh
+            ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
+            : isMedium
+            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+            : isMarket
+            ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20'
+            : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20';
+
+          const IconComponent = isHigh
+            ? AlertTriangle
+            : isMedium
+            ? Cloud
+            : isMarket
+            ? TrendingDown
+            : Sparkles;
+
+          return (
+            <motion.div
+              key={alert.title}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.22 + index * 0.06 }}
+              className={`rounded-[1.75rem] p-4 overflow-hidden border backdrop-blur-2xl transition-all hover:scale-[1.01] ${cardStyle}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl shrink-0 ${iconContainerStyle}`}>
+                  <IconComponent size={17} className="drop-shadow-sm" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p className="text-sm font-extrabold tracking-tight truncate">{alert.title}</p>
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${badgeStyle} shrink-0`}>
+                      {badgeLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs font-medium opacity-90 leading-relaxed">{alert.message}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">{alert.title}</p>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">{alert.message}</p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
 
       {/* ── Action Center (tool grid) ─────────────────────────── */}
@@ -892,66 +1075,97 @@ export default function DashboardPage() {
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{T.tools as string}</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {toolCards.map(({ href, icon: Icon, label, sub, color }) => (
-            <Link key={label} href={href}
-              className="bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-900/5 active:scale-95 transition-transform overflow-hidden rounded-[1.6rem] p-4 haptic-btn">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
-                <Icon size={18} style={{ color }} />
+          {toolCards.map(({ href, icon: Icon, label, sub, gradient, shadow }) => (
+            <Link
+              key={label}
+              href={href}
+              className="group overflow-hidden rounded-[1.75rem] p-4 bg-white/75 dark:bg-slate-900/75 border border-white dark:border-slate-800 backdrop-blur-2xl shadow-[0_4px_20px_rgba(15,23,42,0.06)] hover:shadow-[0_8px_28px_rgba(15,23,42,0.12)] transition-all hover:scale-[1.02] block"
+            >
+              <div className="relative mb-3">
+                <div
+                  className={`relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr ${gradient} text-white border border-white/40 shadow-sm group-hover:scale-105 transition-transform`}
+                  style={{ boxShadow: `0 4px 14px ${shadow}` }}
+                >
+                  <Icon size={18} className="drop-shadow-sm" />
+                </div>
               </div>
-              <p className="text-sm font-bold text-slate-800">{label}</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed font-medium text-slate-500">{sub}</p>
+              <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{label}</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-slate-400">{sub}</p>
             </Link>
           ))}
         </div>
       </motion.div>
 
-      {/* ── Smart Irrigation Advisor ───────────────────────── */}
+      {/* ── Smart Irrigation Advisor (Soft Glass Prism) ────────────────────── */}
       {smartIrrigation && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.31, duration: 0.45 }}
-          className="bg-white shadow-[0_12px_44px_rgba(0,0,0,0.06)] border border-slate-200 overflow-hidden rounded-[2.5rem] p-6"
+          className="relative overflow-hidden rounded-[2.25rem] p-5 shadow-[0_12px_40px_rgba(14,165,233,0.12)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.5)] prism-ring bg-gradient-to-br from-cyan-50/90 via-sky-50/70 to-blue-50/60 dark:from-slate-900/90 dark:via-sky-950/40 dark:to-cyan-950/40 backdrop-blur-2xl border border-sky-200/60 dark:border-sky-800/50 text-slate-800 dark:text-slate-100 transition-all"
         >
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-sky-50 flex items-center justify-center border border-sky-100">
-                <Droplets size={16} className="text-sky-500" />
-              </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-500 block">
-                  {t('intel_smart_irrigation')}
-                </span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                  {t('intel_live_forecast')}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1 border border-slate-100">
-               <span className="text-[10px] font-bold text-slate-500">{t('intel_soil_profile')}: {soilTypeLabel}</span>
-            </div>
-          </div>
-          
-          <div className="mb-6 p-4 rounded-[1.8rem] bg-sky-500/5 border border-sky-500/10">
-            <p className="text-sm font-bold text-slate-800 leading-relaxed">
-              {smartIrrigation.recommendation}
-            </p>
-            <p className="mt-2 text-[11px] font-semibold text-sky-600/70">
-              {t('intel_suggested_interval')}: every {smartIrrigation.irrigation_interval_days} days
-            </p>
-          </div>
+          {/* Ambient cyan lighting glow */}
+          <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-cyan-400/20 dark:bg-cyan-500/15 blur-3xl" />
+          <div className="pointer-events-none absolute -left-8 -bottom-8 h-36 w-36 rounded-full bg-sky-400/15 dark:bg-blue-500/15 blur-3xl" />
 
-          <div className="grid grid-cols-3 gap-3">
-            {(smartIrrigation.week_plan || []).slice(0, 3).map((day) => (
-              <div key={day.date} className="rounded-2xl border border-slate-100 bg-slate-50 p-3 flex flex-col items-center text-center">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">{day.date.slice(5)}</p>
-                <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter mb-1.5 ${day.action.toLowerCase() === 'normal' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-sky-100 text-sky-600 border border-sky-200'}`}>
-                   {day.action === 'normal' ? (isEnglish ? 'NORMAL' : 'सामान्य') : day.action.toUpperCase()}
+          <div className="relative z-10">
+            {/* Header Row */}
+            <div className="mb-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-400 to-cyan-500 text-white shadow-[0_4px_16px_rgba(14,165,233,0.35)] border border-white/40">
+                  <Droplets size={18} className="drop-shadow-sm animate-pulse" />
                 </div>
-                <p className="text-[11px] font-black text-slate-700">{day.rain_mm} mm</p>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-gradient-to-r from-sky-600 to-cyan-600 dark:from-sky-300 dark:to-cyan-300 bg-clip-text text-transparent block">
+                    {t('intel_smart_irrigation')}
+                  </span>
+                  <span className="text-[9px] font-bold text-sky-600/80 dark:text-sky-400/80 uppercase tracking-widest">
+                    {t('intel_live_forecast')}
+                  </span>
+                </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-1.5 rounded-full bg-white/70 dark:bg-slate-800/70 px-3 py-1 border border-white dark:border-slate-700/80 shadow-sm backdrop-blur-md">
+                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                  {t('intel_soil_profile')}: <span className="text-sky-700 dark:text-sky-300 font-extrabold">{soilTypeLabel}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Recommendation Inner Soft Glass Box */}
+            <div className="mb-3.5 p-4 rounded-[1.75rem] bg-white/75 dark:bg-slate-800/75 border border-white dark:border-slate-700/80 backdrop-blur-md shadow-sm">
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-relaxed">
+                {smartIrrigation.recommendation}
+              </p>
+              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 dark:bg-sky-400/10 px-2.5 py-1 border border-sky-500/20 text-[10px] font-extrabold text-sky-700 dark:text-sky-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                <span>{t('intel_suggested_interval')}: every {smartIrrigation.irrigation_interval_days} days</span>
+              </div>
+            </div>
+
+            {/* Week Plan Grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {(smartIrrigation.week_plan || []).slice(0, 3).map((day) => (
+                <div
+                  key={day.date}
+                  className="rounded-2xl border border-white dark:border-slate-700/70 bg-white/60 dark:bg-slate-800/60 p-2.5 backdrop-blur-md flex flex-col items-center text-center shadow-sm"
+                >
+                  <p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-400 mb-1.5">
+                    {day.date.slice(5)}
+                  </p>
+                  <div
+                    className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter mb-1.5 ${
+                      day.action.toLowerCase() === 'normal'
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
+                        : 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20'
+                    }`}
+                  >
+                    {day.action === 'normal' ? (isEnglish ? 'NORMAL' : 'सामान्य') : day.action.toUpperCase()}
+                  </div>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-100">{day.rain_mm} mm</p>
+                </div>
+              ))}
+            </div>
           </div>
         </motion.div>
       )}
@@ -962,91 +1176,234 @@ export default function DashboardPage() {
       )}
 
       {/* ── Market Intel ─────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.34, duration: 0.5 }}
-        className="bg-white shadow-[0_12px_44px_rgba(0,0,0,0.06)] border border-slate-200 overflow-hidden rounded-[2.5rem] p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-rose-50 flex items-center justify-center border border-rose-100">
-               <TrendingDown size={16} className="text-rose-500" />
+      {(() => {
+        const trend = mandiPrice?.trend || '0%';
+        let status: 'up' | 'down' | 'stable' = mandiPrice?.status || 'down';
+        if (trend === '0%' || trend === '0.0%' || trend === '+0%' || trend === '-0%') {
+          status = 'stable';
+        }
+
+        const isUp = status === 'up';
+        const isStable = status === 'stable';
+
+        const glowBg = isUp
+          ? 'from-emerald-500/20 via-teal-500/10 to-transparent'
+          : isStable
+          ? 'from-amber-500/20 via-orange-500/10 to-transparent'
+          : 'from-rose-500/20 via-pink-500/10 to-transparent';
+
+        const iconContainerStyle = isUp
+          ? 'from-emerald-500/15 via-emerald-500/10 to-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shadow-[0_4px_16px_rgba(16,185,129,0.15)]'
+          : isStable
+          ? 'from-amber-500/15 via-amber-500/10 to-amber-500/5 text-amber-600 dark:text-amber-400 border-amber-500/30 shadow-[0_4px_16px_rgba(245,158,11,0.15)]'
+          : 'from-rose-500/15 via-rose-500/10 to-rose-500/5 text-rose-600 dark:text-rose-400 border-rose-500/30 shadow-[0_4px_16px_rgba(244,63,94,0.15)]';
+
+        const headerTextColor = isUp
+          ? 'from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-300'
+          : isStable
+          ? 'from-amber-600 to-amber-500 dark:from-amber-400 dark:to-amber-300'
+          : 'from-rose-600 to-rose-500 dark:from-rose-400 dark:to-rose-300';
+
+        const dotColor = isUp ? 'bg-emerald-500' : isStable ? 'bg-amber-500' : 'bg-rose-500';
+
+        const badgeStyle = isUp
+          ? 'bg-gradient-to-r from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shadow-[0_2px_10px_rgba(16,185,129,0.1)]'
+          : isStable
+          ? 'bg-gradient-to-r from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-300 border-amber-500/30 shadow-[0_2px_10px_rgba(245,158,11,0.1)]'
+          : 'bg-gradient-to-r from-rose-500/15 to-rose-500/5 text-rose-700 dark:text-rose-300 border-rose-500/30 shadow-[0_2px_10px_rgba(244,63,94,0.1)]';
+
+        const badgeIcon = isUp ? (
+          <ArrowUpRight size={14} className="text-emerald-500" />
+        ) : isStable ? (
+          <Activity size={14} className="text-amber-500" />
+        ) : (
+          <TrendingDown size={14} className="text-rose-500" />
+        );
+
+        const statusText = isUp
+          ? t('intel_price_rising')
+          : isStable
+          ? t('intel_price_stable')
+          : t('intel_price_falling');
+
+        const trendTextColor = isUp
+          ? 'text-emerald-500'
+          : isStable
+          ? 'text-amber-500'
+          : 'text-rose-500';
+
+        const strokeColor = isUp ? '#10b981' : isStable ? '#f59e0b' : '#f43f5e';
+        const stopColorTop = isUp
+          ? 'rgba(16,185,129,0.28)'
+          : isStable
+          ? 'rgba(245,158,11,0.28)'
+          : 'rgba(244,63,94,0.28)';
+        const stopColorBottom = isUp
+          ? 'rgba(16,185,129,0.0)'
+          : isStable
+          ? 'rgba(245,158,11,0.0)'
+          : 'rgba(244,63,94,0.0)';
+
+        const sparkPath = isUp
+          ? 'M0,32 C30,28 60,16 100,8'
+          : isStable
+          ? 'M0,22 Q25,16 50,23 T100,20'
+          : 'M0,10 C25,14 65,28 100,35';
+
+        const endCy = isUp ? 8 : isStable ? 20 : 35;
+
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.34, duration: 0.5 }}
+            className="relative overflow-hidden rounded-[2.5rem] bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border border-white/80 dark:border-slate-800/80 shadow-[0_16px_48px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.4)] p-6 sm:p-7 group transition-all duration-300 hover:shadow-[0_20px_60px_rgba(0,0,0,0.09)] dark:hover:border-slate-700"
+          >
+            {/* Ambient Soft Glass Gradient Orb */}
+            <div className={`absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gradient-to-br ${glowBg} blur-[60px] transition-all duration-500 group-hover:scale-125 pointer-events-none`} />
+
+            {/* Header Bar */}
+            <div className="relative z-10 mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-2xl flex items-center justify-center bg-gradient-to-br border backdrop-blur-xl group-hover:scale-105 transition-transform duration-300 ${iconContainerStyle}`}>
+                  {isUp ? <TrendingUp size={18} /> : isStable ? <Activity size={18} /> : <TrendingDown size={18} />}
+                </div>
+                <div className="flex flex-col">
+                  <span className={`text-[11px] font-black uppercase tracking-[0.22em] bg-clip-text text-transparent bg-gradient-to-r ${headerTextColor}`}>
+                    {t('intel_mandi_live')}
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${dotColor} opacity-75`}></span>
+                      <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColor}`}></span>
+                    </span>
+                    <span className="text-[10px] font-extrabold tracking-wider text-slate-400 dark:text-slate-400 uppercase">
+                      Live Market Stream
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-full bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl px-4 py-1.5 border border-slate-200/80 dark:border-slate-700/80 shadow-[0_2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] transition-all duration-300 hover:scale-105">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${dotColor} opacity-75`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${dotColor}`}></span>
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-100">
+                  {cropTranslations[language]?.[profile.activeCrop || profile.crops?.[0] || 'Wheat'] || (profile.activeCrop || profile.crops?.[0] || 'Wheat')}
+                </span>
+              </div>
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500">{t('intel_mandi_live')}</span>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 border border-rose-100">
-             <div className="h-1 w-1 rounded-full bg-rose-500 animate-pulse" />
-             <span className="text-[9px] font-black uppercase tracking-widest text-rose-600">{cropTranslations[language]?.[profile.crops?.[0] || 'Wheat'] || 'Wheat'}</span>
-          </div>
-        </div>
-        
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-               <p className={`text-4xl font-black leading-none tracking-tighter ${mandiPrice?.status === 'up' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                 {mandiPrice?.price || '₹2,300'}
-               </p>
+
+            {/* Price & Trend Status */}
+            <div className="relative z-10 flex items-end justify-between mb-5">
+              <div>
+                <p className="text-4xl sm:text-5xl font-black leading-none tracking-tight text-slate-900 dark:text-white mb-3 drop-shadow-sm">
+                  {mandiPrice?.price || '₹2,300'}
+                </p>
+                <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black tracking-wide border backdrop-blur-md ${badgeStyle}`}>
+                  {badgeIcon}
+                  <span>{statusText}</span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400 mb-1">
+                  {t('intel_per_quintal')}
+                </p>
+                <p className={`text-xl sm:text-2xl font-black tracking-tight ${trendTextColor}`}>
+                  {mandiPrice?.trend || '0%'}
+                </p>
+              </div>
             </div>
-            <p className={`text-[11px] font-bold ${mandiPrice?.status === 'up' ? 'text-emerald-400' : 'text-rose-400'} flex items-center gap-1.5`}>
-              {mandiPrice?.status === 'up' ? <ArrowUpRight size={12} /> : <TrendingDown size={12} />}
-              {mandiPrice?.status === 'up' ? t('intel_price_rising') : t('intel_price_falling')}
+
+            {/* Sparkline Visual */}
+            <div className="relative z-10 h-20 w-full mb-1">
+              <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+                <defs>
+                  <linearGradient id="marketSparklineGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={stopColorTop} />
+                    <stop offset="100%" stopColor={stopColorBottom} />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 1.5, ease: 'easeOut' }}
+                  d={sparkPath}
+                  fill="none" stroke={strokeColor} strokeWidth="3.5" strokeLinecap="round"
+                />
+                <motion.path
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5, duration: 1 }}
+                  d={`${sparkPath} L100,40 L0,40 Z`}
+                  fill="url(#marketSparklineGradient)"
+                />
+                <motion.circle
+                  cx="100"
+                  cy={endCy}
+                  r="4"
+                  fill={strokeColor}
+                  animate={{ scale: [1, 1.5, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+        );
+      })()}
+
+      {/* ── Hotline CTA (Soft Tinted Glass Expert Support Card) ───── */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ delay: 0.38, duration: 0.5 }}
+        className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-emerald-50/80 dark:from-slate-900/90 dark:via-emerald-950/40 dark:to-slate-900/90 backdrop-blur-2xl border border-emerald-500/25 dark:border-emerald-500/35 shadow-[0_8px_32px_rgba(16,185,129,0.08)] dark:shadow-[0_12px_44px_rgba(0,0,0,0.4)] p-5 sm:p-6 group transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_12px_40px_rgba(16,185,129,0.15)]"
+      >
+        {/* Soft Ambient Glow Orbs */}
+        <div className="absolute -left-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/15 blur-[40px] pointer-events-none group-hover:scale-125 transition-transform duration-500" />
+        <div className="absolute -right-10 -bottom-10 h-36 w-36 rounded-full bg-teal-500/15 blur-[40px] pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 dark:via-slate-700/80 to-transparent pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col gap-4">
+          {/* Top Row: Icon + Live Badge */}
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform duration-300">
+              <Headset size={20} className="text-emerald-700 dark:text-emerald-300" />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600/10 dark:bg-emerald-400/15 text-emerald-800 dark:text-emerald-200 text-[10px] font-black tracking-wider uppercase border border-emerald-600/20 whitespace-nowrap">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              <span>24/7 LIVE SUPPORT</span>
+            </div>
+          </div>
+
+          {/* Middle Area: Headline & Explanatory Subtitle (Full width, zero truncation) */}
+          <div className="flex flex-col gap-1">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-snug">
+              {t('247_hotline')}
+            </h3>
+
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t('hotline_value_prop')}
             </p>
           </div>
-          <div className="text-right">
-             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t('intel_per_quintal')}</p>
-             <p className={`text-sm font-black ${mandiPrice?.status === 'up' ? 'text-emerald-500' : 'text-rose-500'}`}>
-               {mandiPrice?.trend || '0%'}
-             </p>
-          </div>
-        </div>
 
-        <div className="h-20 w-full relative mb-2">
-          <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-            <defs>
-              <linearGradient id="marketGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="rgba(244,63,94,0.2)" />
-                <stop offset="100%" stopColor="rgba(244,63,94,0.0)" />
-              </linearGradient>
-            </defs>
-            <motion.path
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 1.5, ease: 'easeOut' }}
-              d="M0,10 C15,10 25,25 40,22 C55,19 65,32 100,35"
-              fill="none" stroke="#f43f5e" strokeWidth="3" strokeLinecap="round"
-            />
-            <motion.path
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 1 }}
-              d="M0,10 C15,10 25,25 40,22 C55,19 65,32 100,35 L100,40 L0,40 Z"
-              fill="url(#marketGradient)"
-            />
-          </svg>
-        </div>
-      </motion.div>
-
-      {/* ── Hotline CTA ──────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.38 }}
-        className="rounded-[2.5rem] p-6 bg-slate-900 border border-slate-800 shadow-xl overflow-hidden relative"
-      >
-        <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/10 blur-[40px] rounded-full" />
-        <div className="relative z-10 flex items-center justify-between">
-           <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-[1.2rem] bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-                 <Users size={22} className="text-emerald-400" />
-              </div>
-              <div>
-                 <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400 mb-1">24/7 LIVE SUPPORT</p>
-                 <h3 className="text-lg font-black text-white">{t('247_hotline')}</h3>
-              </div>
-           </div>
-           <motion.button
-             whileTap={{ scale: 0.9 }}
-             className="h-10 w-10 rounded-2xl bg-white flex items-center justify-center text-slate-900 shadow-lg shadow-white/5"
-           >
-              <ArrowUpRight size={20} />
-           </motion.button>
+          {/* Bottom Area: Full-width Glass Action Button (100% Zero Clipping Guaranteed!) */}
+          <Link href="/assistant" className="block w-full pt-1">
+            <motion.div
+              whileTap={{ scale: 0.97 }}
+              whileHover={{ scale: 1.01 }}
+              className="w-full h-11 sm:h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs tracking-wider flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.28)] transition-all duration-300 cursor-pointer"
+            >
+              <span className="font-extrabold uppercase tracking-widest text-xs">Ask Doctor</span>
+              <ArrowUpRight size={16} className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </motion.div>
+          </Link>
         </div>
       </motion.div>
     </div>

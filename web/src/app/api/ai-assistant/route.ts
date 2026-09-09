@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 const SYSTEM_PROMPT: Record<string, string> = {
@@ -46,59 +47,91 @@ function checkNavIntent(text: string, lang: string): string | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const { query, language } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const { query, language, crop, location } = await req.json();
 
-    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-      return NextResponse.json({ error: 'GEMINI_KEY_MISSING' }, { status: 503 });
+    // 1. Try Backend Group API + Gemini Fallback orchestrator first
+    try {
+      const backendRes = await fetch(`${BACKEND_URL}/api/v1/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: query,
+          language: language || 'Hindi',
+          crop,
+          location,
+          voice_mode: false,
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (backendRes.ok) {
+        const backendData = await backendRes.json();
+        return NextResponse.json({
+          text: backendData.answer || backendData.response || '',
+          navigate: backendData.navigate || null,
+          source: backendData.source || 'group_api',
+          suggestions: backendData.suggestions || [],
+        });
+      }
+    } catch (e) {
+      console.warn('Backend proxy failed, trying edge Gemini fallback:', e);
     }
 
-    // Quick nav intent check before hitting Gemini
+    // 2. Direct Gemini Fallback if backend is unreachable
+    const apiKey = process.env.GEMINI_API_KEY;
     const navRoute = checkNavIntent(query, language);
 
-    const systemPrompt = SYSTEM_PROMPT[language] || SYSTEM_PROMPT['English'];
-
-    const body = {
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${systemPrompt}\n\nFarmer says: "${query}"` }],
+    if (apiKey && apiKey !== 'your_gemini_api_key_here') {
+      const systemPrompt = SYSTEM_PROMPT[language] || SYSTEM_PROMPT['English'];
+      const body = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\nFarmer says: "${query}"` }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 250,
+          topP: 0.85,
         },
-      ],
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 200,
-        topP: 0.8,
-      },
-    };
+      };
 
-    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const navMatch = text.match(/NAVIGATE:(\/\w+)/);
+        if (navMatch) {
+          return NextResponse.json({ navigate: navMatch[1], text: '' });
+        }
+        if (navRoute) {
+          return NextResponse.json({ navigate: navRoute, text: '' });
+        }
+        return NextResponse.json({ text: text.trim(), source: 'gemini_fallback' });
+      }
+    }
+
+    // 3. Fallback to clean local response
+    return NextResponse.json({
+      text:
+        language === 'ਪੰਜਾਬੀ'
+          ? 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਕਿਸਾਨ ਜੀ! ਪੌਦੇ ਦੀ ਫੋਟੋ ਭੇਜੋ ਜਾਂ ਆਪਣਾ ਸਵਾਲ ਪੁੱਛੋ।'
+          : 'नमस्ते किसान जी! आप पौधे के पत्ते की एक साफ फोटो भेज दीजिए या अपना सवाल पूछें।',
+      navigate: navRoute,
+      source: 'local_knowledge',
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      console.error('Gemini error:', err);
-      return NextResponse.json({ error: 'GEMINI_API_ERROR', detail: err }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Check if Gemini itself returned a nav intent
-    const navMatch = text.match(/NAVIGATE:(\/\w+)/);
-    if (navMatch) {
-      return NextResponse.json({ navigate: navMatch[1], text: '' });
-    }
-    if (navRoute) {
-      return NextResponse.json({ navigate: navRoute, text: '' });
-    }
-
-    return NextResponse.json({ text: text.trim() });
   } catch (err) {
     console.error('AI assistant error:', err);
-    return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
+    return NextResponse.json({
+      text: 'नमस्ते किसान जी! मैं आपकी सहायता के लिए यहाँ हूँ। कृपया अपना सवाल पूछें।',
+      source: 'offline_fallback',
+    });
   }
 }

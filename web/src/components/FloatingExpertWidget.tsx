@@ -32,8 +32,8 @@ export default function FloatingExpertWidget() {
           <div className="absolute inset-0 rounded-full bg-rose-300 opacity-30 blur-md animate-pulse" />
 
           {/* Glass pill */}
-          <div className={`relative flex items-center gap-3 rounded-full border border-slate-200/80 bg-white/95 backdrop-blur-[60px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] pl-2 py-2 transition-all duration-500 ${isOpen ? 'pr-2' : 'pr-4'}`}>
-            <div className={`h-10 w-10 flex items-center justify-center rounded-full text-white shadow-inner transition-colors duration-500 ${isOpen ? 'bg-slate-100/50 text-slate-500' : 'bg-[linear-gradient(135deg,#fda4af,#fb7185)]'}`}>
+          <div className={`relative flex items-center gap-3 rounded-full border border-slate-200/80 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-[60px] shadow-[0_8px_32px_rgba(0,0,0,0.2)] pl-2 py-2 transition-all duration-500 ${isOpen ? 'pr-2' : 'pr-4'}`}>
+            <div className={`h-10 w-10 flex items-center justify-center rounded-full text-white shadow-inner transition-colors duration-500 ${isOpen ? 'bg-slate-100/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-300' : 'bg-[linear-gradient(135deg,#fda4af,#fb7185)]'}`}>
               {isOpen
                 ? <X size={20} className="group-hover:rotate-90 transition-transform duration-300" />
                 : <PhoneCall size={20} className="animate-[wiggle_2s_ease-in-out_infinite] origin-center" />
@@ -41,8 +41,8 @@ export default function FloatingExpertWidget() {
             </div>
             {!isOpen && (
               <div className="flex flex-col text-left">
-                <span className="w-fit rounded-full border border-rose-200 bg-rose-50 px-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-rose-600">24/7</span>
-                <span className="mt-0.5 text-[11px] font-black leading-tight tracking-tight text-slate-800 max-w-[160px]">
+                <span className="w-fit rounded-full border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/60 px-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-rose-600 dark:text-rose-400">24/7</span>
+                <span className="mt-0.5 text-[11px] font-black leading-tight tracking-tight text-slate-800 dark:text-slate-100 max-w-[160px]">
                   {hotlineText}
                 </span>
               </div>

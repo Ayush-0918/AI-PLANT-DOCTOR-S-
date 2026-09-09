@@ -7,7 +7,10 @@ from app.api.deps import enforce_rate_limit, get_admin_user, get_current_user, g
 from app.core.config import settings
 from app.core.database import get_database
 from app.models.schemas import ExpertCallRequest, ExpertCallResponse
-from app.services.expert_call_service import trigger_expert_call, update_call_status_from_webhook
+
+from app.services.expert import trigger_expert_call, update_call_status_from_webhook
+
+
 
 router = APIRouter(prefix="/expert", tags=["Expert Calls"], dependencies=[Depends(enforce_rate_limit)])
 

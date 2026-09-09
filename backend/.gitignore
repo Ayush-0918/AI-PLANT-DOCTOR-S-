@@ -1,13 +1,37 @@
-# Environment variables
+# Environments
 .env
+.env.*
+!.env.example
 
-# Virtual environment
+# Virtual Environments
 .venv/
 venv/
+venv*/
+ENV/
+env/
 
-# Python cache
+# Python cache & artifacts
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.ruff_cache/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
 
-# Log files
+# Logs & Stray outputs
 *.log
+*.pdf
+backend.log
+
+# Heavy Models (Track with Git LFS if versioned)
+*.pth
+*.pt
+*.onnx
+
+# System & IDE
+.DS_Store
+.idea/
+.vscode/

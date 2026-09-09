@@ -173,7 +173,16 @@ PLANT_TREATMENTS = {
 }
 
 # Path to the PlantVillage fine-tuned model weights
-_MODEL_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plantvillage_model.pth")
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_BACKEND_DIR = os.path.dirname(_BASE_DIR)
+_MODEL_CANDIDATE_PATHS = [
+    os.getenv("PLANTVILLAGE_MODEL_PATH", ""),
+    os.path.join(_PROJECT_BACKEND_DIR, "data", "models", "plantvillage_model.pth"),
+    os.path.join(_PROJECT_BACKEND_DIR, "data", "plantvillage_model.pth"),
+    os.path.join(_BASE_DIR, "plantvillage_model.pth"),
+]
+_MODEL_WEIGHTS_PATH = next((p for p in _MODEL_CANDIDATE_PATHS if p and os.path.exists(p)), os.path.join(_PROJECT_BACKEND_DIR, "data", "models", "plantvillage_model.pth"))
+
 
 
 def _build_plantvillage_model():

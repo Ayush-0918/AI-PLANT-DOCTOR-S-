@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader  # type: ignore[import]
 from torchvision import datasets, models, transforms  # type: ignore[import]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MODEL_PATH = PROJECT_ROOT / "backend" / "app" / "plantvillage_model.pth"
+MODEL_PATH = PROJECT_ROOT / "backend" / "data" / "models" / "plantvillage_model.pth"
 STATIC_DIR = PROJECT_ROOT / "backend" / "static"
 FIELD_REPORT_PATH = STATIC_DIR / "field_validation_report.json"
 MODEL_REGISTRY_PATH = STATIC_DIR / "model_registry.json"

@@ -6,7 +6,9 @@ from app.core.config import settings
 from app.core.database import get_database
 from app.core.rate_limit import InMemoryRateLimiter
 from app.core.security import decode_access_token
-from app.services.auth_service import get_user_by_id
+from app.services.auth import get_user_by_id
+
+
 
 rate_limiter = InMemoryRateLimiter(
     max_requests=settings.rate_limit_requests,

@@ -9,14 +9,17 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import enforce_rate_limit, get_optional_user
 from app.core.database import get_database
 from app.core.errors import DependencyError, ValidationError
-from app.services.dataset_locator_service import (
+from app.services.market import (
+    ThreatMapService,
+    fetch_7day_forecast,
+    fetch_live_weather,
+    mandi_trend_service,
+)
+from app.services.soil import estimate_fertilizer_investment
+from app.services.system import (
     AGRICULTURE_PRICE_DATASET_CANDIDATES,
     first_existing_path,
 )
-from app.services.mandi_trend_service import mandi_trend_service
-from app.services.soil_advice_service import estimate_fertilizer_investment
-from app.services.threat_map_service import ThreatMapService
-from app.services.weather_service import fetch_7day_forecast, fetch_live_weather
 
 router = APIRouter(prefix="/intelligence", tags=["Advanced Intelligence"], dependencies=[Depends(enforce_rate_limit)])
 

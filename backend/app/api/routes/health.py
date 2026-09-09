@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import enforce_rate_limit
 from app.core.database import get_database
-from app.services.model_registry_service import get_active_model
+from app.services.system import get_active_model
+
 
 router = APIRouter(prefix="/health", tags=["Health"], dependencies=[Depends(enforce_rate_limit)])
 

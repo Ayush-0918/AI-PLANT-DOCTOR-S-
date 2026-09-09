@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 import pandas as pd  # type: ignore[import]
 
-from app.services.dataset_locator_service import (
+from app.services.system.dataset_locator_service import (
     FERTILIZER_RECOMMENDATION_CANDIDATES,
     first_existing_path,
 )

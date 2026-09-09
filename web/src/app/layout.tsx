@@ -5,8 +5,10 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { AtmosphericProvider } from "@/context/AtmosphericContext";
 import { FarmerProfileProvider } from "@/context/FarmerProfileContext";
 import { ExpertCallProvider } from "@/context/ExpertCallContext";
+import { AssistantProvider } from "@/context/AssistantContext";
 import AtmosphericShell from "@/components/AtmosphericShell";
 import ExpertCallModal from "@/components/ExpertCallModal";
+import FarmerAssistantModal from "@/components/farmer/FarmerAssistantModal";
 
 export const metadata: Metadata = {
   title: "Plant Doctor AI",
@@ -33,12 +35,15 @@ export default function RootLayout({
         <LanguageProvider>
           <FarmerProfileProvider>
             <ExpertCallProvider>
-              <AtmosphericProvider>
-                <AtmosphericShell>
-                  <AppShell>{children}</AppShell>
-                  <ExpertCallModal />
-                </AtmosphericShell>
-              </AtmosphericProvider>
+              <AssistantProvider>
+                <AtmosphericProvider>
+                  <AtmosphericShell>
+                    <AppShell>{children}</AppShell>
+                    <ExpertCallModal />
+                    <FarmerAssistantModal />
+                  </AtmosphericShell>
+                </AtmosphericProvider>
+              </AssistantProvider>
             </ExpertCallProvider>
           </FarmerProfileProvider>
         </LanguageProvider>

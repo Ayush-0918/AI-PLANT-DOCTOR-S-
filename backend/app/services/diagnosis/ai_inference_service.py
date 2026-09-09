@@ -6,16 +6,16 @@ from typing import Any, Dict, Optional
 from app.ai_model import ai_model
 from app.core.config import settings
 from app.core.errors import ValidationError
-from app.services.knowledge_base_service import (
+from app.services.diagnosis.knowledge_base_service import (
     get_growth_care_recommendations,
     get_localized_treatment_summary,
     get_localized_medicine,
     normalize_language,
     get_treatment_record,
 )
-from app.services.model_registry_service import get_active_model
-from app.services.prediction_log_service import image_sha256, log_prediction
-from app.services.weather_service import fetch_live_weather
+from app.services.system.model_registry_service import get_active_model
+from app.services.system.prediction_log_service import image_sha256, log_prediction
+from app.services.market.weather_service import fetch_live_weather
 
 import io
 try:
@@ -28,7 +28,7 @@ except ImportError:
     torch = None
 
 
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve_severity_from_weather_risk(risk_payload: Dict[str, Any]) -> str:
@@ -237,11 +237,30 @@ async def run_soil_inference(
     """
     resolved_model_path = Path(model_path)
     if not resolved_model_path.is_absolute():
-        resolved_model_path = BACKEND_ROOT / resolved_model_path
+        for candidate in [
+            BACKEND_ROOT / "data" / "models" / resolved_model_path.name,
+            BACKEND_ROOT / "data" / resolved_model_path.name,
+            BACKEND_ROOT / resolved_model_path,
+        ]:
+            if candidate.exists():
+                resolved_model_path = candidate
+                break
+        else:
+            resolved_model_path = BACKEND_ROOT / resolved_model_path
 
     resolved_labels_path = Path(labels_path)
     if not resolved_labels_path.is_absolute():
-        resolved_labels_path = BACKEND_ROOT / resolved_labels_path
+        for candidate in [
+            BACKEND_ROOT / "data" / "models" / resolved_labels_path.name,
+            BACKEND_ROOT / "data" / "datasets" / resolved_labels_path.name,
+            BACKEND_ROOT / "data" / resolved_labels_path.name,
+            BACKEND_ROOT / resolved_labels_path,
+        ]:
+            if candidate.exists():
+                resolved_labels_path = candidate
+                break
+        else:
+            resolved_labels_path = BACKEND_ROOT / resolved_labels_path
 
     if not torch or not Image or not resolved_model_path.exists():
         return {"success": False, "reason": "Model file or dependencies missing"}

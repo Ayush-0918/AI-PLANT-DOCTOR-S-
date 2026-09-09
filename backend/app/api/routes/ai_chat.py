@@ -1,123 +1,204 @@
 import logging
-import os
-from typing import List, Literal, Optional
-from fastapi import APIRouter
+from typing import Any, Dict, List, Literal, Optional
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
-from gtts import gTTS
 
-try:
-    from langchain_community.chat_models import ChatOllama
-    from langchain.schema import HumanMessage, AIMessage, SystemMessage
-except ImportError:
-    ChatOllama = None
-    HumanMessage = None  # type: ignore[assignment]
-    AIMessage = None  # type: ignore[assignment]
-    SystemMessage = None  # type: ignore[assignment]
+from app.api.deps import enforce_rate_limit
+from app.services.assistant import assistant_orchestrator, conversation_state_manager
+from app.services.market import mandi_trend_service
 
-from app.services.mandi_trend_service import mandi_trend_service
-
-router = APIRouter(prefix="/ai", tags=["AI Chat"])
+router = APIRouter(prefix="/ai", tags=["AI Chat"], dependencies=[Depends(enforce_rate_limit)])
 logger = logging.getLogger(__name__)
-
-# Configure Ollama (Local AI)
-if ChatOllama is not None:
-    # Switched to llama3 for better Hinglish and instruction following
-    model = ChatOllama(model="llama3", temperature=0.7)
-else:
-    model = None
 
 
 class ChatMessage(BaseModel):
-    role: Literal["user", "assistant", "model"] = "user"
+    role: Literal["user", "assistant", "model", "system"] = "user"
     content: str = Field(default="", max_length=4000)
 
 
 class ChatRequest(BaseModel):
     message: str = Field(default="", max_length=4000)
+    conversation_id: Optional[str] = Field(default=None, description="Stable conversation UUID")
     history: List[ChatMessage] = Field(default_factory=list)
     voice_mode: bool = Field(default=False)
-    language: str = Field(default="English")
+    language: str = Field(default="Hindi")
+    crop: Optional[str] = None
+    location: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
 
 
-class ChatResponse(BaseModel):
-    success: bool
-    response: str
+class ResetConversationRequest(BaseModel):
+    conversation_id: str
+    language: Optional[str] = "Hindi"
+
+
+class NormalizedChatResponse(BaseModel):
+    success: bool = True
+    answer: str
+    response: str  # Backwards compatibility alias for answer
+    language: str = "hi"
+    source: str = "primary"
+    confidence: float = 0.95
+    suggestions: List[str] = Field(default_factory=list)
+    audio: Optional[str] = None
     voice_url: Optional[str] = None
+    navigate: Optional[str] = None
+    latency_sec: Optional[float] = None
+    conversation_id: Optional[str] = None
 
 
-TTS_LANG_MAP = {
-    "English": "en",
-    "हिंदी": "hi",
-    "भोजपुरी": "hi",
-    "मैथिली": "hi",
-    "ਪੰਜਾਬੀ": "pa",
-    "मराठी": "mr",
-    "ગુજરાતી": "gu",
-    "తెలుగు": "te",
-}
+MANDI_QUERY_KEYWORDS = [
+    "mandi", "rate", "price", "bhav", "bhaav", "dam", "bikri", "bechna", "sell", "market",
+    "मंडी", "भाव", "दाम", "बिक्री", "बेचना", "बाजार", "कीमत", "मंडी भाव", "ਮੰਡੀ", "ਭਾਅ"
+]
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat_with_ollama(req: ChatRequest):
-    if not model:
-        return ChatResponse(success=False, response="Langchain or Ollama packages are missing. Please pip install langchain-community ollama.")
-    
-    try:
-        # Fetch high-level market context to inject into AI
-        trends = mandi_trend_service.get_crop_trends()
-        market_context = "\n".join([f"- {t['commodity']}: {t['trend']} ({t['delta_pct']}%)" for t in trends[:5]])
 
-        messages = []
-        
-        # Market-aware agronomist prompt with multilingual output control
-        system_instruction = (
-            "You are an expert AI Plant Doctor for Indian farmers. "
-            "You diagnose crop issues, advise treatment, and explain mandi price strategy clearly. \n"
-            "CRITICAL RULES: \n"
-            f"1. Reply in farmer language preference: {req.language}. If unknown, use Hinglish. \n"
-            "2. Be warm, respectful (like a real expert Doctor), and very concise. \n"
-            "3. If suggesting medicines or fertilizers, give exact chemical names (like Mancozeb, Urea, Neem Oil) and basic dosages if possible. \n"
-            "4. If user asks about selling/holding crop, include mandi trend signal and a practical action window. \n"
-            "5. Mention uncertainty honestly where data is limited; never invent medical or financial certainty. \n"
-            "LIVE MANDI CONTEXT: \n"
-            f"{market_context}"
+def is_mandi_query(text: str) -> bool:
+    if not text:
+        return False
+    lower = text.lower()
+    return any(kw in lower for kw in MANDI_QUERY_KEYWORDS)
+
+
+@router.post("/chat", response_model=NormalizedChatResponse)
+@router.post("/assistant", response_model=NormalizedChatResponse)
+async def chat_with_assistant(req: ChatRequest):
+    """
+    Multilingual Farmer AI Assistant with Group API (Primary) and Gemini (Automatic Fallback).
+    Maintains persistent conversation state and strict natural greeting control.
+    """
+    user_query = req.message.strip()
+
+    if not user_query:
+        return NormalizedChatResponse(
+            success=True,
+            answer="नमस्ते किसान जी! आप अपनी फसल या खेती के बारे में कुछ भी पूछ सकते हैं।",
+            response="नमस्ते किसान जी! आप अपनी फसल या खेती के बारे में कुछ भी पूछ सकते हैं।",
+            language="hi",
+            source="degraded",
+            suggestions=["📷 पत्ती की फोटो भेजें", "🌾 खाद की सही मात्रा", "💰 मंडी भाव"],
+            conversation_id=req.conversation_id,
         )
-        
-        messages.append(SystemMessage(content=system_instruction))
-        
-        # Convert history
-        for msg in req.history:
-            if not msg.content.strip():
-                continue
-            if msg.role == "user":
-                messages.append(HumanMessage(content=msg.content))
-            else:
-                messages.append(AIMessage(content=msg.content))
-        
-        user_message = req.message.strip()
-        if not user_message:
-            return ChatResponse(success=False, response="Kisan bhai, kripya apna sawal type karein.")
-            
-        messages.append(HumanMessage(content=user_message))
 
-        # Ask local Ollama LLM
-        response = (model.invoke(messages).content or "").strip()
-        if not response:
-            return ChatResponse(success=False, response="No response generated.")
+    # Build context dictionary
+    ctx: Dict[str, Any] = req.context or {}
+    if req.crop:
+        ctx["crop"] = req.crop
+    if req.location:
+        ctx["location"] = req.location
+    if req.conversation_id:
+        ctx["conversation_id"] = req.conversation_id
 
-        voice_url = None
-        if req.voice_mode:
-            try:
-                tts_lang = TTS_LANG_MAP.get(req.language, "hi")
-                tts = gTTS(text=response, lang=tts_lang)
-                audio_filename = f"chat_response_{os.urandom(4).hex()}.mp3"
-                audio_path = os.path.join("static", "uploads", audio_filename)
-                os.makedirs(os.path.dirname(audio_path), exist_ok=True)
-                tts.save(audio_path)
-                voice_url = f"/static/uploads/{audio_filename}"
-            except Exception as tts_err:
-                logger.error(f"TTS Error: {tts_err}")
+    # Inject mandi trend intelligence ONLY when user query is about mandi/prices
+    if is_mandi_query(user_query):
+        try:
+            mandi_intel = await mandi_trend_service.get_mandi_intelligence(
+                commodity=req.crop or "Wheat",
+                location=req.location,
+            )
+            if mandi_intel and mandi_intel.get("modal_price", 0) > 0:
+                ctx["mandi_trends"] = (
+                    f"{mandi_intel.get('commodity')}: ₹{mandi_intel.get('modal_price')}/quintal "
+                    f"({mandi_intel.get('trend')}, range: {mandi_intel.get('price_range')})"
+                )
+                ctx["mandi_data_freshness"] = mandi_intel.get("data_freshness", "live")
+        except Exception as e:
+            logger.warning(f"Failed to inject mandi intelligence into context: {e}")
 
-        return ChatResponse(success=True, response=response, voice_url=voice_url)
-    except Exception as e:
-        logger.error(f"Ollama Chat Error: {e}")
-        return ChatResponse(success=False, response="Sorry, mera AI server (Ollama) backend connection me problem aa rahi hai. Kripya backend terminal check karein aur ensure karein ki Ollama chal raha hai.")
+    # Pass conversation history
+    if req.history:
+        ctx["history"] = [{"role": m.role, "content": m.content} for m in req.history[-6:]]
+
+    result = await assistant_orchestrator.ask(
+        message=user_query,
+        context=ctx,
+        language=req.language,
+        voice_requested=req.voice_mode,
+        conversation_id=req.conversation_id,
+    )
+
+    answer = result.get("answer", "")
+    raw_source = str(result.get("source", "primary")).lower()
+    if "local" in raw_source or "degraded" in raw_source:
+        normalized_source = "degraded"
+    elif "fallback" in raw_source or "gemini" in raw_source or "mistral" in raw_source:
+        normalized_source = "fallback"
+    else:
+        normalized_source = "primary"
+
+    return NormalizedChatResponse(
+        success=True,
+        answer=answer,
+        response=answer,
+        language=result.get("language", "hi"),
+        source=normalized_source,
+        confidence=result.get("confidence", 0.90),
+        suggestions=result.get("suggestions", []),
+        audio=result.get("audio"),
+        voice_url=result.get("audio"),
+        navigate=result.get("navigate"),
+        latency_sec=result.get("latency_sec"),
+        conversation_id=result.get("conversation_id"),
+    )
+
+
+@router.post("/reset")
+async def reset_conversation_endpoint(req: ResetConversationRequest):
+    """
+    Explicitly resets conversation state for a given conversation_id.
+    """
+    state = conversation_state_manager.reset_conversation(req.conversation_id, req.language or "hi")
+    return {"success": True, "conversation_id": state.conversation_id, "message": "Conversation state reset successfully."}
+
+
+@router.post("/analyze-leaf")
+async def analyze_leaf_image(
+    image: UploadFile = File(...),
+    question: str = Form(default="इस पत्ते में क्या बीमारी है?"),
+    crop: str = Form(default=""),
+    language: str = Form(default="Hindi"),
+    conversation_id: Optional[str] = Form(default=None),
+):
+    """
+    Multimodal image analysis via Group API with Gemini vision fallback.
+    """
+    if image.content_type and not (image.content_type.startswith("image/") or image.content_type in ["application/octet-stream"]):
+        raise HTTPException(status_code=400, detail="Invalid file type. Image file required.")
+
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Image file is empty.")
+
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds maximum limit of 10MB.")
+
+    context = {"crop": crop} if crop else {}
+    if conversation_id:
+        context["conversation_id"] = conversation_id
+
+    result = await assistant_orchestrator.analyze_plant(
+        question=question,
+        image_bytes=image_bytes,
+        context=context,
+        language=language,
+        conversation_id=conversation_id,
+    )
+    raw_source = str(result.get("source", "primary")).lower()
+    if "local" in raw_source or "degraded" in raw_source:
+        norm_source = "degraded"
+    elif "fallback" in raw_source or "gemini" in raw_source:
+        norm_source = "fallback"
+    else:
+        norm_source = "primary"
+
+    return {
+        "success": True,
+        "answer": result.get("answer"),
+        "response": result.get("answer"),
+        "language": result.get("language"),
+        "source": norm_source,
+        "confidence": result.get("confidence"),
+        "suggestions": result.get("suggestions"),
+        "navigate": result.get("navigate"),
+        "conversation_id": result.get("conversation_id"),
+    }
