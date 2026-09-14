@@ -256,6 +256,50 @@ def send_order_confirmation_email(
             except Exception:
                 pass
         logger.error(f"Resend API call failed for order {order_id}: {err_detail}")
+        err_lower = err_detail.lower()
+        test_mode_triggers = [
+            "testing emails to your own email address",
+            "testing email address",
+            "testing email",
+            "own email address",
+            "verify a domain",
+            "resend.com/domains",
+            "domains like",
+            "only send testing emails",
+        ]
+
+        if any(trigger in err_lower for trigger in test_mode_triggers):
+            owner_email = os.getenv("RESEND_DEFAULT_RECIPIENT", "rdxayushpandey00@gmail.com").strip()
+            if buyer_email.strip().lower() != owner_email.lower():
+                logger.info(f"Resend testing restriction triggered for '{buyer_email}'. Retrying delivery to verified account owner '{owner_email}'.")
+                retry_payload = dict(payload)
+                retry_payload["to"] = [owner_email]
+                try:
+                    req_owner = urllib.request.Request(
+                        "https://api.resend.com/emails",
+                        data=json.dumps(retry_payload).encode("utf-8"),
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                            "User-Agent": "PlantDoctors-Backend/1.0",
+                        },
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req_owner) as resp_owner:
+                        resp_bytes_owner = resp_owner.read()
+                        data_owner = json.loads(resp_bytes_owner.decode("utf-8")) if resp_bytes_owner else {}
+                        resend_id_owner = data_owner.get("id", "resend_ok")
+                        logger.info(f"Fallback email delivered to owner ({owner_email}) for order {order_id}. Resend ID: {resend_id_owner}")
+                        return {
+                            "sent": True,
+                            "method": "resend_rest_owner_fallback",
+                            "resend_id": resend_id_owner,
+                            "recipient": owner_email,
+                            "note": f"Resend Free Tier test mode: Email sent to account owner ({owner_email}) instead of unverified recipient ({buyer_email}). Verify domain at resend.com/domains for custom recipients."
+                        }
+                except Exception as owner_exc:
+                    logger.error(f"Fallback dispatch to owner failed: {owner_exc}")
+
         return {
             "sent": False,
             "error": f"Resend API Error: {err_detail}",
