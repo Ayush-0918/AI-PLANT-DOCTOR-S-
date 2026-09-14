@@ -83,7 +83,7 @@ export default function MarketplacePage() {
   const [submitting, setSubmitting] = useState(false);
   const [retryingEmail, setRetryingEmail] = useState(false);
   const [form, setForm] = useState<OrderForm>({
-    buyer_name: '', buyer_phone: '', buyer_email: '',
+    buyer_name: 'Ayush Pandey', buyer_phone: '', buyer_email: 'rdxayushpandey00@gmail.com',
     buyer_address: '', quantity: 1, rental_days: 1,
   });
 
@@ -176,7 +176,7 @@ export default function MarketplacePage() {
     setCheckoutStep('form');
     setPaymentMethod('upi_qr');
     setOrderResult(null);
-    setForm({ buyer_name: '', buyer_phone: '', buyer_email: '', buyer_address: '', quantity: 1, rental_days: 1 });
+    setForm({ buyer_name: 'Ayush Pandey', buyer_phone: '', buyer_email: 'rdxayushpandey00@gmail.com', buyer_address: '', quantity: 1, rental_days: 1 });
   };
 
   const loadRazorpayScript = () => {
