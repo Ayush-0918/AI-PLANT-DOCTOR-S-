@@ -9,7 +9,7 @@ import {
   CreditCard, QrCode, Truck, Mail, Check, Copy, ShieldAlert,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/context/LanguageContext';
@@ -122,8 +122,8 @@ const getRentalDailyRateStr = (priceStr: string): string => {
   return `₹${rate.toLocaleString('en-IN')}`;
 };
 
-// ─── Main Page ─────────────────────────────────────────────
-export default function MarketplacePage() {
+// ─── Marketplace Content ───────────────────────────────────
+function MarketplaceContent() {
   const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'All');
@@ -1268,5 +1268,17 @@ function BottomModal({ isOpen, onClose, title, children }: { isOpen: boolean; on
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white">
+        <Loader2 className="animate-spin text-emerald-500" size={32} />
+      </div>
+    }>
+      <MarketplaceContent />
+    </Suspense>
   );
 }

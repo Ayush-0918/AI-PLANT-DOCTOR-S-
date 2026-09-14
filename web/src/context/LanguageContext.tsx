@@ -1026,21 +1026,17 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 const STORAGE_KEY = 'plant-doctor/language';
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Always init with 'English' so SSR and first client render are identical (no hydration mismatch)
-  const [language, setLanguage] = useState('English');
-
-  // After mount, load the real saved language from localStorage
-  useEffect(() => {
-    try {
-      const savedLanguage = window.localStorage.getItem(STORAGE_KEY);
-      if (savedLanguage && dictionary[savedLanguage]) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setLanguage(savedLanguage);
+  const [language, setLanguage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedLanguage = window.localStorage.getItem(STORAGE_KEY);
+        if (savedLanguage && dictionary[savedLanguage]) return savedLanguage;
+      } catch (error) {
+        // fallback
       }
-    } catch (error) {
-      console.error('Failed to restore language', error);
     }
-  }, []);
+    return 'English';
+  });
 
   useEffect(() => {
     try {

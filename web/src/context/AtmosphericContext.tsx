@@ -48,7 +48,17 @@ const AtmosphericContext = createContext<AtmosphericTheme>({
 export function AtmosphericProvider({ children }: { children: ReactNode }) {
   // Initialize with default to match server
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('night');
-  const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(null);
+  const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('theme-override') as 'light' | 'dark' | null;
+        if (saved === 'light' || saved === 'dark') return saved;
+      } catch (e) {
+        // fallback
+      }
+    }
+    return null;
+  });
   const [healthScore, setHealthScore] = useState(85);
 
   // Update time AFTER hydration only
@@ -78,16 +88,7 @@ export function AtmosphericProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Sync on mount from persisted override
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const saved = localStorage.getItem('theme-override') as 'light' | 'dark' | null;
-    if (saved) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setThemeOverride(saved);
-      document.documentElement.classList.toggle('dark', saved === 'dark');
-    }
-  }, []);
+
 
   useEffect(() => {
     if (themeOverride) localStorage.setItem('theme-override', themeOverride);
