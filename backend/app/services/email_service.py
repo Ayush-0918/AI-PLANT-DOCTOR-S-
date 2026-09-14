@@ -14,6 +14,13 @@ except ImportError:
     resend = None
 
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+_BACKEND_DIR = Path(__file__).resolve().parents[3]
+_ENV_PATH = _BACKEND_DIR / ".env"
+
+
 def send_order_confirmation_email(
     buyer_email: str,
     buyer_name: str,
@@ -31,6 +38,11 @@ def send_order_confirmation_email(
     Dispatches a real transactional order confirmation email using Resend API.
     Does NOT simulate success: returns sent=True only when Resend accepts the email request.
     """
+    if _ENV_PATH.exists():
+        load_dotenv(_ENV_PATH, override=True)
+    else:
+        load_dotenv(override=True)
+
     if not buyer_email or "@" not in buyer_email:
         logger.warning(f"Invalid recipient email provided for order {order_id}: '{buyer_email}'")
         return {"sent": False, "error": "Invalid recipient email address", "recipient": buyer_email}
