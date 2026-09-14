@@ -48,18 +48,19 @@ const AtmosphericContext = createContext<AtmosphericTheme>({
 export function AtmosphericProvider({ children }: { children: ReactNode }) {
   // Initialize with default to match server
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('night');
-  const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('theme-override') as 'light' | 'dark' | null;
-        if (saved === 'light' || saved === 'dark') return saved;
-      } catch (e) {
-        // fallback
-      }
-    }
-    return null;
-  });
+  const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(null);
   const [healthScore, setHealthScore] = useState(85);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('theme-override') as 'light' | 'dark' | null;
+      if (saved === 'light' || saved === 'dark') {
+        setThemeOverride(saved);
+      }
+    } catch (e) {
+      // fallback
+    }
+  }, []);
 
   // Update time AFTER hydration only
   useEffect(() => {

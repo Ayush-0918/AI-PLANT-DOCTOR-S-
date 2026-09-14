@@ -12,6 +12,7 @@ export default function AtmosphericShell({ children }: { children: React.ReactNo
   return (
     <div
       className="relative min-h-screen transition-all duration-[3000ms] ease-in-out"
+      suppressHydrationWarning={true}
       style={{
         background: isNight
           ? 'linear-gradient(145deg, #06101d 0%, #0a1728 46%, #0f2337 100%)'
