@@ -25,7 +25,7 @@ export default function BottomNav() {
 
   return (
     <div 
-      className="fixed left-4 right-4 z-50 pointer-events-none"
+      className="absolute left-4 right-4 z-50 pointer-events-none"
       style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}
     >
       <div className="pointer-events-auto max-w-md mx-auto">

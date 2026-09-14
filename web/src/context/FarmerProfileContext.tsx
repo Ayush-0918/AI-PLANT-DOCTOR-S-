@@ -25,6 +25,8 @@ export interface FarmerProfile {
   onboardingCompleted: boolean;
   latitude: number | null;
   longitude: number | null;
+  locationSource: 'gps' | 'ip' | 'profile' | 'manual' | null;
+  isApproximateLocation: boolean;
   joinedLabel: string;
   avatarUrl: string | null;
 }
@@ -32,33 +34,38 @@ export interface FarmerProfile {
 const STORAGE_KEY = 'plant-doctor/farmer-profile';
 
 const defaultProfile: FarmerProfile = {
-  name: 'Kishan Kumar',
-  village: 'Nalanda',
-  state: 'Bihar',
-  locationLabel: 'Nalanda, Bihar',
+  name: 'किशन कुमार',
+  village: '',
+  state: '',
+  locationLabel: '',
   soilType: 'loamy',
   farmerType: 'Progressive Farmer',
   farmSize: '3.5 acres',
-  crops: ['Wheat', 'Rice', 'Tomato'],
-  activeCrop: 'Wheat',
+  crops: ['गेहूँ', 'धान', 'टमाटर'],
+  activeCrop: 'गेहूँ',
   voiceEnabled: true,
   locationAllowed: false,
   onboardingCompleted: false,
   latitude: null,
   longitude: null,
+  locationSource: null,
+  isApproximateLocation: false,
   joinedLabel: 'Mar 2026',
   avatarUrl: null,
 };
 
 function normalizeProfile(profile: FarmerProfile): FarmerProfile {
+  const locationParts = [profile.village, profile.state].filter(Boolean);
   const locationLabel =
-    [profile.village, profile.state].filter(Boolean).join(', ') || 'India';
+    locationParts.length > 0
+      ? locationParts.join(', ')
+      : profile.locationLabel || '';
 
   // Ensure activeCrop is always one of the selected crops
   const activeCrop =
     profile.crops.includes(profile.activeCrop)
       ? profile.activeCrop
-      : profile.crops[0] || 'Wheat';
+      : profile.crops[0] || 'गेहूँ';
 
   return {
     ...profile,

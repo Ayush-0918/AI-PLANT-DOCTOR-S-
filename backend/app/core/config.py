@@ -1,6 +1,16 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Ensure .env is loaded from the backend root
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+_ENV_PATH = _BACKEND_DIR / ".env"
+if _ENV_PATH.exists():
+    load_dotenv(_ENV_PATH)
+else:
+    load_dotenv()
+
 
 
 def _to_bool(value: str, default: bool = False) -> bool:
@@ -40,6 +50,9 @@ class Settings:
     vapi_phone_number_id: str
     vapi_webhook_secret: str
     vapi_url: str
+    twilio_account_sid: str
+    twilio_auth_token: str
+    twilio_phone_number: str
     group_api_url: str
     group_api_key: str
     group_api_timeout: float
@@ -61,6 +74,8 @@ class Settings:
     mistral_model: str
     stt_provider: str
     tts_provider: str
+    data_gov_api_key: str
+    data_gov_resource_id: str
     static_dir: Path
     model_registry_path: Path
     accuracy_path: Path
@@ -91,6 +106,9 @@ def load_settings() -> Settings:
         vapi_phone_number_id=os.getenv("VAPI_PHONE_NUMBER_ID", ""),
         vapi_webhook_secret=os.getenv("VAPI_WEBHOOK_SECRET", ""),
         vapi_url=os.getenv("VAPI_URL", "https://api.vapi.ai/call"),
+        twilio_account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+        twilio_auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+        twilio_phone_number=os.getenv("TWILIO_PHONE_NUMBER", ""),
         group_api_url=os.getenv("GROUP_API_URL", ""),
         group_api_key=os.getenv("GROUP_API_KEY", ""),
         group_api_timeout=_to_float(os.getenv("GROUP_API_TIMEOUT"), 5.0),
@@ -112,6 +130,8 @@ def load_settings() -> Settings:
         mistral_model=os.getenv("MISTRAL_MODEL", "mistral-large-latest"),
         stt_provider=os.getenv("STT_PROVIDER", "sarvam"),
         tts_provider=os.getenv("TTS_PROVIDER", "sarvam"),
+        data_gov_api_key=os.getenv("DATA_GOV_API_KEY", ""),
+        data_gov_resource_id=os.getenv("DATA_GOV_RESOURCE_ID", "35985678-0d79-46b4-9ed6-6f13308a1d24"),
         static_dir=static_dir,
         model_registry_path=static_dir / "model_registry.json",
         accuracy_path=static_dir / "accuracy.json",

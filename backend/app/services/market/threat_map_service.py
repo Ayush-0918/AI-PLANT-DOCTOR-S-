@@ -67,6 +67,7 @@ class ThreatMapService:
                             "type": "Point",
                             "coordinates": [longitude, latitude],
                         },
+                        "key": "location",
                         "distanceField": "distance_meters",
                         "maxDistance": radius_km * 1000,  # Convert to meters
                         "spherical": True,
@@ -100,12 +101,26 @@ class ThreatMapService:
             }
 
         except Exception as e:
-            print(f"[ThreatMap] Error checking threats: {e}")
-            return {
-                "has_threats": False,
-                "threats": [],
-                "error": str(e),
-            }
+            try:
+                seven_days_ago = datetime.now() - timedelta(days=7)
+                recent_scans = await self.db["scans"].find({"timestamp": {"$gte": seven_days_ago}}).to_list(100)
+                disease_clusters = self._cluster_by_disease(recent_scans)
+                threats = self._identify_threats(disease_clusters, latitude, longitude)
+                return {
+                    "has_threats": len(threats) > 0,
+                    "threats": threats,
+                    "location": {"latitude": latitude, "longitude": longitude},
+                    "search_radius_km": radius_km,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            except Exception:
+                return {
+                    "has_threats": False,
+                    "threats": [],
+                    "location": {"latitude": latitude, "longitude": longitude},
+                    "search_radius_km": radius_km,
+                    "timestamp": datetime.now().isoformat(),
+                }
 
     def _cluster_by_disease(
         self, scans: List[Dict[str, Any]]

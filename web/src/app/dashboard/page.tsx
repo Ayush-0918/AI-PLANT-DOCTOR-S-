@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Bell,
   Camera,
+  ChevronDown,
   Cloud,
   Droplets,
   Headset,
@@ -33,6 +34,8 @@ import { useAtmosphere } from '@/context/AtmosphericContext';
 import { useFarmerProfile } from '@/context/FarmerProfileContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatSoilTypeLabel, normalizeSoilType } from '@/lib/soil';
+import { detectFarmerLocation } from '@/lib/locationDetector';
+import LocationSwitcherModal from '@/components/LocationSwitcherModal';
 import WealthPredictor from '@/components/WealthPredictor';
 import FarmerAssistantCard from '@/components/farmer/FarmerAssistantCard';
 
@@ -47,6 +50,9 @@ type WeatherData = {
   description: string;
   city: string;
   weather_alerts: string[];
+  tomorrow_description?: string;
+  risk_level?: string;
+  risk_score?: number;
 };
 
 type ThreatData = {
@@ -58,7 +64,7 @@ type ThreatData = {
 };
 
 type AlertItem = {
-  type: string;
+  type: 'disease' | 'weather' | 'market' | 'irrigation' | 'roi';
   title: string;
   message: string;
   priority: 'high' | 'medium' | 'low';
@@ -71,10 +77,16 @@ type SubscriptionStatus = {
 };
 
 type SmartIrrigationData = {
+  crop?: string;
+  soil_type?: string;
   recommendation: string;
   irrigation_interval_days: number;
-  source: string;
-  week_plan: Array<{ date: string; action: string; rain_mm: number; note: string }>;
+  source?: string;
+  soil_moisture_estimate_pct?: number;
+  next_irrigation_due_days?: number;
+  irrigation_advisory_hindi?: string;
+  recommendation_summary?: string;
+  week_plan?: Array<{ date: string; action: string; rain_mm: number; note: string }>;
 };
 
 type RoiDashboardData = {
@@ -117,7 +129,7 @@ const cropTranslations: Record<string, Record<string, string>> = {
 
 export default function DashboardPage() {
   const { profile, updateProfile } = useFarmerProfile();
-  const { setHealthScore, isDark } = useAtmosphere();
+  const { healthScore, setHealthScore, isDark } = useAtmosphere();
   const { language, t } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState(() =>
@@ -126,7 +138,7 @@ export default function DashboardPage() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [threatAlert, setThreatAlert] = useState<ThreatData | null>(null);
-  const [mandiPrice, setMandiPrice] = useState<{ price: string; trend: string; status?: 'up' | 'down' | 'stable' } | null>(null);
+  const [mandiPrice, setMandiPrice] = useState<{ price: string; market?: string; trend: string; status?: 'up' | 'down' | 'stable' } | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [smartIrrigation, setSmartIrrigation] = useState<SmartIrrigationData | null>(null);
@@ -135,35 +147,38 @@ export default function DashboardPage() {
   const fetchMandiPrices = useCallback(async (crop: string) => {
     try {
       const [priceRes, trendRes] = await Promise.all([
-        fetch(`${API_BASE}/api/v1/mandi/prices?commodity=${crop}&limit=1`),
-        fetch(`${API_BASE}/api/v1/mandi/trends?commodity=${crop}`)
+        fetch(`${API_BASE}/api/v1/mandi/prices?commodity=${encodeURIComponent(crop)}&limit=1`),
+        fetch(`${API_BASE}/api/v1/mandi/trends?commodity=${encodeURIComponent(crop)}`),
       ]);
 
       if (priceRes.ok) {
         const data = await priceRes.json();
-        if (data.success && data.data.length > 0) {
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
           const item = data.data[0];
-          let trendVal = '-2.4%';
-          let trendStat = 'down';
+          let trendVal = '0.0%';
+          let trendStat: 'up' | 'down' | 'stable' = 'stable';
 
           if (trendRes.ok) {
             const trendData = await trendRes.json();
             const trends = Array.isArray(trendData?.trends)
               ? (trendData.trends as Array<{ commodity?: string; delta_pct?: number; trend?: 'up' | 'down' | 'stable' }>)
               : [];
-            const cropTrend = trends.find((item) => (item.commodity || '').toLowerCase() === crop.toLowerCase());
+            const cropTrend = trends.find((t) => (t.commodity || '').toLowerCase() === crop.toLowerCase());
             if (cropTrend) {
               const delta = Number(cropTrend.delta_pct || 0);
-              trendVal = `${delta > 0 ? '+' : ''}${delta}%`;
+              trendVal = `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`;
               trendStat = cropTrend.trend || 'stable';
             }
           }
 
           setMandiPrice({
-            price: `₹${item.modal_price.toLocaleString('en-IN')}`,
+            price: `₹${Number(item.modal_price).toLocaleString('en-IN')}`,
+            market: item.market || item.district || '',
             trend: trendVal,
-            status: trendStat as 'up' | 'down' | 'stable'
+            status: trendStat,
           });
+        } else {
+          setMandiPrice(null);
         }
       }
     } catch {
@@ -173,13 +188,24 @@ export default function DashboardPage() {
 
   const fetchWeatherAndThreats = useCallback(async (lat: number, lon: number) => {
     try {
-      const [wRes, tRes] = await Promise.all([
+      const [wRes, tRes, fRes] = await Promise.all([
         fetch(`${API_BASE}/api/v1/geo/weather?lat=${lat}&lon=${lon}`),
         fetch(`${API_BASE}/api/v1/geo/threats?lat=${lat}&lon=${lon}&radius=10`),
+        fetch(`${API_BASE}/api/v1/geo/forecast?lat=${lat}&lon=${lon}`),
       ]);
+
+      let tomorrowDesc = '';
+      if (fRes.ok) {
+        const fData = await fRes.json();
+        if (fData.success && Array.isArray(fData.forecast) && fData.forecast.length > 1) {
+          tomorrowDesc = fData.forecast[1]?.description || fData.forecast[0]?.description || '';
+        }
+      }
+
       if (wRes.ok) {
         const wData = await wRes.json();
         const weatherNode = wData?.weather || {};
+        const diseaseRisk = weatherNode?.disease_risk || {};
         setWeather({
           temperature: `${Math.round(weatherNode.temperature_c ?? 0)}°C`,
           feels_like: `${Math.round(weatherNode.feels_like_c ?? 0)}°C`,
@@ -187,19 +213,24 @@ export default function DashboardPage() {
           wind_speed: `${Math.round(weatherNode.wind_kmh ?? 0)} km/h`,
           description: weatherNode.description || 'Weather unavailable',
           city: weatherNode.city || profile.locationLabel || 'Your location',
-          weather_alerts: weatherNode?.disease_risk?.farming_alerts || [],
+          weather_alerts: diseaseRisk?.farming_alerts || [],
+          tomorrow_description: tomorrowDesc || weatherNode.description || 'Clear sky',
+          risk_level: diseaseRisk?.risk_level || 'low',
+          risk_score: diseaseRisk?.risk_score ?? 15,
         });
-        const riskScore = Number(weatherNode?.disease_risk?.risk_score || 0);
+        const riskScore = Number(diseaseRisk?.risk_score || 0);
         setHealthScore(Math.max(45, 100 - riskScore));
       }
       if (tRes.ok) {
         const tData = await tRes.json();
         if (tData.has_threats && tData.threats?.length > 0) {
           setThreatAlert(tData.threats[0]);
+        } else {
+          setThreatAlert(null);
         }
       }
     } catch {
-      console.warn('Weather API unavailable, using defaults');
+      console.warn('Weather API unavailable');
     } finally {
       setWeatherLoading(false);
     }
@@ -260,6 +291,7 @@ export default function DashboardPage() {
   }, [profile.farmSize, profile.soilType]);
   const [lat, setLat] = useState<number | null>(null);
   const [lon, setLon] = useState<number | null>(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -273,37 +305,47 @@ export default function DashboardPage() {
       .slice(0, 60);
     void fetchSubscriptionStatus(derivedUserId);
 
-    // Try geolocation, fallback to Bihar coords
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLat(pos.coords.latitude);
-          setLon(pos.coords.longitude);
-          void fetchWeatherAndThreats(pos.coords.latitude, pos.coords.longitude);
-        },
-        () => {
-          setLat(25.5);
-          setLon(85.1);
-          void fetchWeatherAndThreats(25.5, 85.1);
-        },
-        { timeout: 5000 }
-      );
-    } else {
-      setLat(25.5);
-      setLon(85.1);
-      void fetchWeatherAndThreats(25.5, 85.1);
-    }
+    // Multi-tier Real Location Detection: GPS -> IP -> Profile -> Manual Prompt
+    void (async () => {
+      const detection = await detectFarmerLocation(profile, true);
+      if (detection.success) {
+        if (detection.latitude != null && detection.longitude != null) {
+          setLat(detection.latitude);
+          setLon(detection.longitude);
+          void fetchWeatherAndThreats(detection.latitude, detection.longitude);
+        }
+        if (detection.locationLabel && detection.locationLabel !== profile.locationLabel) {
+          updateProfile({
+            locationLabel: detection.locationLabel,
+            village: detection.village || profile.village,
+            state: detection.state || profile.state,
+            latitude: detection.latitude ?? profile.latitude,
+            longitude: detection.longitude ?? profile.longitude,
+            locationAllowed: detection.locationSource === 'gps',
+            locationSource: detection.locationSource,
+            isApproximateLocation: detection.isApproximateLocation,
+          });
+        }
+      } else {
+        // If neither GPS nor IP nor profile location exists, prompt modal
+        if (!profile.locationLabel && !profile.latitude) {
+          setIsLocationModalOpen(true);
+        }
+      }
+    })();
 
     return () => clearInterval(timer);
-  }, [setHealthScore, fetchWeatherAndThreats, fetchSubscriptionStatus, profile.name, profile.locationLabel]);
+  }, [setHealthScore, fetchWeatherAndThreats, fetchSubscriptionStatus, profile.name, profile.locationLabel, profile.village, profile.state, profile.latitude, profile.longitude, updateProfile]);
 
   // Refetch crop-specific data whenever the activeCrop or location changes
   useEffect(() => {
     const activeCrop = profile.activeCrop || profile.crops?.[0] || 'Wheat';
     fetchMandiPrices(activeCrop);
-    const resolvedLat = lat ?? profile.latitude ?? 25.5;
-    const resolvedLon = lon ?? profile.longitude ?? 85.1;
-    void fetchIntelligenceInsights(resolvedLat, resolvedLon, activeCrop);
+    const resolvedLat = lat ?? profile.latitude ?? null;
+    const resolvedLon = lon ?? profile.longitude ?? null;
+    if (resolvedLat !== null && resolvedLon !== null) {
+      void fetchIntelligenceInsights(resolvedLat, resolvedLon, activeCrop);
+    }
   }, [profile.activeCrop, profile.crops, lat, lon, profile.latitude, profile.longitude, fetchMandiPrices, fetchIntelligenceInsights]);
 
 
@@ -480,47 +522,104 @@ export default function DashboardPage() {
     [profile.crops]
   );
   const activeCrop = profile.activeCrop || cropList[0];
+  const displayCrop = !isEnglish && cropTranslations[language]?.[activeCrop] ? cropTranslations[language][activeCrop] : activeCrop;
   const alerts: AlertItem[] = useMemo(() => {
     const items: AlertItem[] = [];
 
+    // ── 1. REAL Disease & Pest Outbreak Threat (from community scans or live weather fungal model) ──
     if (threatAlert) {
       items.push({
         type: 'disease',
-        title: threatAlert.disease.replace(/_/g, ' '),
-        message: threatAlert.recommendation || (T.rustMsg as string),
-        priority: 'high',
+        title: `${threatAlert.disease.replace(/_/g, ' ')} (${threatAlert.alert_level.toUpperCase()})`,
+        message: isEnglish
+          ? `${threatAlert.farmer_count} field report(s) within ${threatAlert.distance_km.toFixed(1)} km. ${threatAlert.recommendation}`
+          : `${threatAlert.distance_km.toFixed(1)} किमी में ${threatAlert.farmer_count} मामले दर्ज। ${threatAlert.recommendation}`,
+        priority: threatAlert.alert_level === 'high' ? 'high' : 'medium',
       });
-    } else {
-      items.push({ type: 'disease', title: T.highRust as string, message: T.rustMsg as string, priority: 'high' });
-    }
-
-    if (weather?.weather_alerts?.[0]) {
+    } else if (weather?.weather_alerts && weather.weather_alerts.length > 0) {
       items.push({
-        type: 'weather',
-        title: T.rainAlert as string,
+        type: 'disease',
+        title: isEnglish ? 'Meteorological Crop Risk' : 'मौसम आधारित फसल जोखिम',
         message: weather.weather_alerts[0],
         priority: 'medium',
       });
     } else {
-      items.push({ type: 'weather', title: T.rainAlert as string, message: T.rainMsg as string, priority: 'medium' });
+      items.push({
+        type: 'disease',
+        title: isEnglish ? `Crop Health Status • ${displayCrop}` : `फसल स्वास्थ्य स्थिति • ${displayCrop}`,
+        message: isEnglish
+          ? `Zero active pest outbreaks within 10 km of ${profile.locationLabel || weather?.city || 'your field'}. Current weather (${weather?.temperature || '28°C'}, humidity ${weather?.humidity || '60%'}) is optimal.`
+          : `${profile.locationLabel || weather?.city || 'आपके क्षेत्र'} के 10 किमी में कोई सक्रिय कीट प्रकोप नहीं है। वर्तमान मौसम (${weather?.temperature || '28°C'}, नमी ${weather?.humidity || '60%'}) फसल के अनुकूल है।`,
+        priority: 'low',
+      });
     }
 
-    items.push({
-      type: 'market',
-      title: `${T.marketIntel as string} • ${activeCrop || 'Wheat'}`,
-      message: isEnglish
-        ? `Current mandi trend: ${mandiPrice?.trend || '-2.4%'} (${mandiPrice?.price || '₹2,350'}). Plan sale in 24 hours.`
-        : `वर्तमान मंडी ट्रेंड: ${mandiPrice?.trend || '-2.4%'} (${mandiPrice?.price || '₹2,350'}). 24 घंटे में बिक्री योजना बनाएं।`,
-      priority: 'low',
-    });
-
-    if (!subscription || subscription.status === 'trial' || subscription.plan_code === 'basic') {
+    // ── 2. REAL Live Weather Operational Advisory (from OpenWeather) ──
+    if (weather?.weather_alerts && weather.weather_alerts.length > 1) {
       items.push({
-        type: 'subscription',
-        title: isEnglish ? 'Premium Insights Available' : 'प्रीमियम इनसाइट्स उपलब्ध',
+        type: 'weather',
+        title: isEnglish ? `Weather Warning • ${weather?.city || 'Local'}` : `मौसम चेतावनी • ${weather?.city || 'स्थानीय'}`,
+        message: weather.weather_alerts[1],
+        priority: 'medium',
+      });
+    } else if (weather) {
+      items.push({
+        type: 'weather',
+        title: isEnglish ? `Field Operations Weather • ${weather.city || profile.locationLabel || 'Local'}` : `खेत कार्य मौसम • ${weather.city || profile.locationLabel || 'स्थानीय'}`,
         message: isEnglish
-          ? 'Upgrade to Premium for advanced weather-market alerts and expert priority.'
-          : 'एडवांस मौसम-मंडी अलर्ट और विशेषज्ञ प्राथमिकता के लिए प्रीमियम लें।',
+          ? `Condition: ${weather.description} · Temp: ${weather.temperature} (Feels ${weather.feels_like}) · Wind: ${weather.wind_speed} · Humidity: ${weather.humidity}. Good for field operations.`
+          : `मौसम: ${weather.description} · तापमान: ${weather.temperature} · हवा: ${weather.wind_speed} · नमी: ${weather.humidity}। खेत कार्य व निगरानी के लिए उपयुक्त।`,
+        priority: 'low',
+      });
+    }
+
+    // ── 3. REAL Live Mandi Price & Market Trends (from Agmarknet / live mandi feed) ──
+    if (mandiPrice) {
+      const marketLabel = mandiPrice.market ? ` (${mandiPrice.market})` : '';
+      items.push({
+        type: 'market',
+        title: `${isEnglish ? 'Live Mandi Rate' : 'लाइव मंडी भाव'} • ${displayCrop}${marketLabel}`,
+        message: isEnglish
+          ? `Modal Price: ${mandiPrice.price}/quintal (${mandiPrice.trend}). ${mandiPrice.status === 'up' ? 'Price gaining momentum — good window for spot dispatch.' : mandiPrice.status === 'down' ? 'Downside pressure noted across regional markets.' : 'Stable rate across regional mandis.'}`
+          : `मॉडल भाव: ${mandiPrice.price}/क्विंटल (${mandiPrice.trend})। ${mandiPrice.status === 'up' ? 'दाम में तेजी — बिक्री के लिए उपयुक्त अवसर।' : mandiPrice.status === 'down' ? 'मंडी में नरमी का रुख।' : 'क्षेत्रीय मंडियों में भाव स्थिर बने हुए हैं।'}`,
+        priority: mandiPrice.status === 'down' ? 'medium' : 'low',
+      });
+    } else {
+      items.push({
+        type: 'market',
+        title: `${isEnglish ? 'Mandi Intelligence' : 'मंडी भाव'} • ${displayCrop}`,
+        message: isEnglish
+          ? `Connecting to agricultural market feed for ${displayCrop}...`
+          : `${displayCrop} के लिए लाइव मंडी डेटा सिंक किया जा रहा है...`,
+        priority: 'low',
+      });
+    }
+
+    if (smartIrrigation) {
+      const intervalDays = smartIrrigation.irrigation_interval_days || 3;
+      const irrigationMsg = smartIrrigation.recommendation
+        ? (!isEnglish && smartIrrigation.irrigation_advisory_hindi ? smartIrrigation.irrigation_advisory_hindi : smartIrrigation.recommendation)
+        : isEnglish
+        ? `Recommended irrigation cycle: every ${intervalDays} days based on field soil moisture.`
+        : `मिट्टी की नमी के अनुसार हर ${intervalDays} दिन में सिंचाई की सलाह दी जाती है।`;
+
+      items.push({
+        type: 'irrigation',
+        title: isEnglish ? `Smart Irrigation • ${smartIrrigation.crop || activeCrop}` : `स्मार्ट सिंचाई सलाह • ${smartIrrigation.crop || activeCrop}`,
+        message: irrigationMsg,
+        priority: 'low',
+      });
+    } else if (roiData) {
+      const netProfit = Math.round(roiData.income?.net_inr || 0).toLocaleString('en-IN');
+      const roiPct = roiData.income?.roi_pct || 0;
+      const farmAcres = profile.farmSize || '1';
+
+      items.push({
+        type: 'roi',
+        title: isEnglish ? `ROI Forecast • ${roiData.crop || activeCrop}` : `आय पूर्वानुमान • ${roiData.crop || activeCrop}`,
+        message: isEnglish
+          ? `Projected Net Profit: ₹${netProfit} (ROI: ${roiPct}%) for ${farmAcres} acre.`
+          : `अनुमानित शुद्ध लाभ: ₹${netProfit} (ROI: ${roiPct}%) प्रति ${farmAcres} एकड़।`,
         priority: 'low',
       });
     }
@@ -528,17 +627,16 @@ export default function DashboardPage() {
     return items.slice(0, 4);
   }, [
     threatAlert,
-    weather?.weather_alerts,
-    mandiPrice?.price,
-    mandiPrice?.trend,
-    T.highRust,
-    T.rustMsg,
-    T.rainAlert,
-    T.rainMsg,
-    T.marketIntel,
-    cropList,
+    weather,
+    mandiPrice,
+    smartIrrigation,
+    roiData,
+    activeCrop,
+    displayCrop,
+    profile.locationLabel,
+    profile.farmSize,
+    profile.soilType,
     isEnglish,
-    subscription,
   ]);
 
   const roiShareHref = useMemo(() => {
@@ -588,7 +686,7 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="min-h-full space-y-5 px-4 pb-32 pt-5 text-slate-800 dark:text-slate-100 relative"
+      className="min-h-full space-y-5 px-4 pb-6 sm:pb-8 pt-5 text-slate-800 dark:text-slate-100 relative"
       style={{
         background: isDark
           ? 'transparent'
@@ -603,10 +701,26 @@ export default function DashboardPage() {
           <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-emerald-600/80 mb-1" suppressHydrationWarning>{greeting}</p>
           <h1 className="text-[2.2rem] font-black tracking-tight text-slate-900 leading-none" suppressHydrationWarning>{firstName}</h1>
           <div className="mt-2.5 flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600 shadow-sm ring-1 ring-slate-900/5">
-              <MapPin size={11} className="text-emerald-500" />
-              {profile.locationLabel || 'Nalanda, Bihar'}
-            </div>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                if (navigator.vibrate) navigator.vibrate(8);
+                setIsLocationModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200 shadow-sm ring-1 ring-slate-900/10 dark:ring-white/10 hover:ring-emerald-500/40 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+              title="Tap to change location"
+            >
+              <MapPin size={11} className="text-emerald-500 shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                {profile.locationLabel || (isEnglish ? 'Set Location' : 'स्थान चुनें')}
+              </span>
+              {profile.isApproximateLocation && (
+                <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 opacity-85">
+                  ({isEnglish ? 'Approx' : 'अनुमानित'})
+                </span>
+              )}
+              <ChevronDown size={11} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+            </motion.button>
             <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1.5 border border-emerald-500/20 text-[10px] font-bold text-emerald-600">
               <Zap size={10} className="text-emerald-500" />
               <span>Live</span>
@@ -680,17 +794,19 @@ export default function DashboardPage() {
         <div className="pointer-events-none absolute -left-8 -bottom-8 h-40 w-40 rounded-full bg-teal-400/15 dark:bg-teal-500/15 blur-3xl" />
 
         {/* Top row: badge + time */}
-        <div className="relative z-10 flex items-center justify-between mb-3.5">
-          <div className="flex items-center gap-2">
-            <div className="rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 border border-emerald-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300 backdrop-blur-md">
+        <div className="relative z-10 flex items-center justify-between gap-2 mb-3.5">
+          <div className="flex items-center gap-1.5 min-w-0 flex-nowrap">
+            <span className="inline-flex items-center rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 border border-emerald-500/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300 backdrop-blur-md whitespace-nowrap">
               {T.copilot as string}
-            </div>
-            <div className="flex items-center gap-1 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Live</span>
-            </div>
+            </span>
           </div>
-          <span className="text-xs font-semibold text-slate-400 dark:text-slate-400" suppressHydrationWarning>{time}</span>
+          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0 tabular-nums ml-auto" suppressHydrationWarning>
+            {time}
+          </span>
         </div>
 
         {/* Main content: text + leaf icon orb */}
@@ -714,7 +830,7 @@ export default function DashboardPage() {
           {[
             {
               label: T.farmHealth as string,
-              value: '88%',
+              value: `${Math.round(healthScore || 85)}%`,
               icon: '🌾',
               cardStyle: 'bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-emerald-100/70 dark:from-emerald-950/40 dark:via-slate-900/80 dark:to-teal-950/40 border-emerald-200/70 dark:border-emerald-800/60 shadow-[0_4px_16px_rgba(16,185,129,0.08)]',
               valColor: 'text-emerald-950 dark:text-emerald-100',
@@ -859,11 +975,16 @@ export default function DashboardPage() {
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400 block">
                   {T.weather as string}
                 </span>
-                {weather && (
-                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                    {weather.city}
+                <button
+                  onClick={() => setIsLocationModalOpen(true)}
+                  className="flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer group"
+                  title="Tap to change location"
+                >
+                  <span className="truncate max-w-[150px] sm:max-w-[220px]">
+                    {weather?.city || profile.locationLabel || (isEnglish ? 'Set Location' : 'स्थान चुनें')}
                   </span>
-                )}
+                  <ChevronDown size={11} className="text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+                </button>
               </div>
             </div>
 
@@ -901,10 +1022,10 @@ export default function DashboardPage() {
                   </span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 dark:bg-amber-400/10 px-3 py-1 border border-amber-500/25 backdrop-blur-md">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-300">
-                    {T.rustRisk as string}
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 px-3 py-1 border border-emerald-500/25 backdrop-blur-md">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                    {isEnglish ? 'Optimal Weather' : 'मौसम अनुकूल'}
                   </span>
                 </div>
               )}
@@ -933,7 +1054,7 @@ export default function DashboardPage() {
               {
                 icon: Cloud,
                 label: T.tomorrow as string,
-                value: T.lightRain as string,
+                value: weatherLoading ? '—' : (weather?.tomorrow_description || (isEnglish ? 'Partly cloudy' : 'हल्के बादल')),
                 cardBg: 'bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-violet-50/70 dark:from-indigo-950/40 dark:via-slate-900/80 dark:to-violet-950/40 border-indigo-200/60 dark:border-indigo-800/60 shadow-[0_4px_16px_rgba(99,102,241,0.08)]',
                 iconBg: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/40',
                 valColor: 'text-indigo-950 dark:text-indigo-100',
@@ -997,49 +1118,57 @@ export default function DashboardPage() {
       {/* ── Alerts (Soft Glass Prism & Category Orbs) ───────────────────────────── */}
       <AnimatePresence>
         {alerts.map((alert, index) => {
-          const isHigh = alert.priority === 'high' || alert.type === 'disease';
-          const isMedium = alert.priority === 'medium' || alert.type === 'weather';
-          const isMarket = alert.type === 'market';
+          let cardStyle = 'bg-gradient-to-br from-slate-50/90 via-slate-100/60 to-slate-200/70 border-slate-200/70 text-slate-900 shadow-sm';
+          let iconContainerStyle = 'bg-gradient-to-tr from-slate-500 to-slate-700 text-white border border-white/30 shadow-md';
+          let badgeLabel = 'ALERT';
+          let badgeStyle = 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20';
+          let IconComponent = AlertTriangle;
 
-          const cardStyle = isHigh
-            ? 'bg-gradient-to-br from-rose-50/90 via-red-50/60 to-orange-50/70 dark:from-rose-950/50 dark:via-slate-900/90 dark:to-red-950/40 border-rose-200/70 dark:border-rose-800/60 text-rose-950 dark:text-rose-100 shadow-[0_4px_20px_rgba(244,63,94,0.08)]'
-            : isMedium
-            ? 'bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-yellow-50/70 dark:from-amber-950/50 dark:via-slate-900/90 dark:to-orange-950/40 border-amber-200/70 dark:border-amber-800/60 text-amber-950 dark:text-amber-100 shadow-[0_4px_20px_rgba(245,158,11,0.08)]'
-            : isMarket
-            ? 'bg-gradient-to-br from-sky-50/90 via-cyan-50/60 to-blue-50/70 dark:from-sky-950/50 dark:via-slate-900/90 dark:to-blue-950/40 border-sky-200/70 dark:border-sky-800/60 text-sky-950 dark:text-sky-100 shadow-[0_4px_20px_rgba(14,165,233,0.08)]'
-            : 'bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-violet-50/70 dark:from-indigo-950/50 dark:via-slate-900/90 dark:to-purple-950/40 border-indigo-200/70 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.08)]';
-
-          const iconContainerStyle = isHigh
-            ? 'bg-gradient-to-tr from-rose-500 to-red-500 text-white shadow-[0_4px_14px_rgba(244,63,94,0.35)] border border-white/30'
-            : isMedium
-            ? 'bg-gradient-to-tr from-amber-400 to-orange-500 text-white shadow-[0_4px_14px_rgba(245,158,11,0.35)] border border-white/30'
-            : isMarket
-            ? 'bg-gradient-to-tr from-sky-400 to-blue-500 text-white shadow-[0_4px_14px_rgba(14,165,233,0.35)] border border-white/30'
-            : 'bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] border border-white/30';
-
-          const badgeLabel = isHigh
-            ? 'HIGH RISK'
-            : isMedium
-            ? 'WEATHER'
-            : isMarket
-            ? 'MARKET'
-            : 'PREMIUM';
-
-          const badgeStyle = isHigh
-            ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20'
-            : isMedium
-            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
-            : isMarket
-            ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20'
-            : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20';
-
-          const IconComponent = isHigh
-            ? AlertTriangle
-            : isMedium
-            ? Cloud
-            : isMarket
-            ? TrendingDown
-            : Sparkles;
+          if (alert.type === 'disease') {
+            if (alert.priority === 'high') {
+              cardStyle = 'bg-gradient-to-br from-rose-50/90 via-red-50/60 to-orange-50/70 dark:from-rose-950/50 dark:via-slate-900/90 dark:to-red-950/40 border-rose-200/70 dark:border-rose-800/60 text-rose-950 dark:text-rose-100 shadow-[0_4px_20px_rgba(244,63,94,0.08)]';
+              iconContainerStyle = 'bg-gradient-to-tr from-rose-500 to-red-500 text-white shadow-[0_4px_14px_rgba(244,63,94,0.35)] border border-white/30';
+              badgeLabel = isEnglish ? 'HIGH RISK' : 'उच्च खतरा';
+              badgeStyle = 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20';
+              IconComponent = AlertTriangle;
+            } else if (alert.priority === 'medium') {
+              cardStyle = 'bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-yellow-50/70 dark:from-amber-950/50 dark:via-slate-900/90 dark:to-orange-950/40 border-amber-200/70 dark:border-amber-800/60 text-amber-950 dark:text-amber-100 shadow-[0_4px_20px_rgba(245,158,11,0.08)]';
+              iconContainerStyle = 'bg-gradient-to-tr from-amber-400 to-orange-500 text-white shadow-[0_4px_14px_rgba(245,158,11,0.35)] border border-white/30';
+              badgeLabel = isEnglish ? 'RISK ADVISORY' : 'रोग सलाह';
+              badgeStyle = 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20';
+              IconComponent = AlertTriangle;
+            } else {
+              cardStyle = 'bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-emerald-100/70 dark:from-emerald-950/50 dark:via-slate-900/90 dark:to-teal-950/40 border-emerald-200/70 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-100 shadow-[0_4px_20px_rgba(16,185,129,0.08)]';
+              iconContainerStyle = 'bg-gradient-to-tr from-emerald-500 to-teal-500 text-white shadow-[0_4px_14px_rgba(16,185,129,0.35)] border border-white/30';
+              badgeLabel = isEnglish ? 'FIELD SAFE' : 'खेत सुरक्षित';
+              badgeStyle = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20';
+              IconComponent = ShieldCheck;
+            }
+          } else if (alert.type === 'weather') {
+            cardStyle = 'bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-yellow-50/70 dark:from-amber-950/50 dark:via-slate-900/90 dark:to-orange-950/40 border-amber-200/70 dark:border-amber-800/60 text-amber-950 dark:text-amber-100 shadow-[0_4px_20px_rgba(245,158,11,0.08)]';
+            iconContainerStyle = 'bg-gradient-to-tr from-amber-400 to-orange-500 text-white shadow-[0_4px_14px_rgba(245,158,11,0.35)] border border-white/30';
+            badgeLabel = alert.priority === 'medium' ? (isEnglish ? 'WEATHER ALERT' : 'मौसम चेतावनी') : (isEnglish ? 'WEATHER' : 'मौसम');
+            badgeStyle = 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20';
+            IconComponent = Cloud;
+          } else if (alert.type === 'market') {
+            cardStyle = 'bg-gradient-to-br from-sky-50/90 via-cyan-50/60 to-blue-50/70 dark:from-sky-950/50 dark:via-slate-900/90 dark:to-blue-950/40 border-sky-200/70 dark:border-sky-800/60 text-sky-950 dark:text-sky-100 shadow-[0_4px_20px_rgba(14,165,233,0.08)]';
+            iconContainerStyle = 'bg-gradient-to-tr from-sky-400 to-blue-500 text-white shadow-[0_4px_14px_rgba(14,165,233,0.35)] border border-white/30';
+            badgeLabel = isEnglish ? 'MANDI RATE' : 'मंडी भाव';
+            badgeStyle = 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20';
+            IconComponent = mandiPrice?.status === 'up' ? TrendingUp : mandiPrice?.status === 'down' ? TrendingDown : BarChart3;
+          } else if (alert.type === 'irrigation') {
+            cardStyle = 'bg-gradient-to-br from-cyan-50/90 via-teal-50/60 to-emerald-50/70 dark:from-cyan-950/50 dark:via-slate-900/90 dark:to-teal-950/40 border-cyan-200/70 dark:border-cyan-800/60 text-cyan-950 dark:text-cyan-100 shadow-[0_4px_20px_rgba(6,182,212,0.08)]';
+            iconContainerStyle = 'bg-gradient-to-tr from-cyan-500 to-teal-500 text-white shadow-[0_4px_14px_rgba(6,182,212,0.35)] border border-white/30';
+            badgeLabel = isEnglish ? 'SMART IRRIGATION' : 'स्मार्ट सिंचाई';
+            badgeStyle = 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20';
+            IconComponent = Droplets;
+          } else if (alert.type === 'roi') {
+            cardStyle = 'bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-violet-50/70 dark:from-indigo-950/50 dark:via-slate-900/90 dark:to-purple-950/40 border-indigo-200/70 dark:border-indigo-800/60 text-indigo-950 dark:text-indigo-100 shadow-[0_4px_20px_rgba(99,102,241,0.08)]';
+            iconContainerStyle = 'bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] border border-white/30';
+            badgeLabel = isEnglish ? 'ROI FORECAST' : 'आय अनुमान';
+            badgeStyle = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20';
+            IconComponent = Sparkles;
+          }
 
           return (
             <motion.div
@@ -1278,7 +1407,7 @@ export default function DashboardPage() {
                       <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColor}`}></span>
                     </span>
                     <span className="text-[10px] font-extrabold tracking-wider text-slate-400 dark:text-slate-400 uppercase">
-                      Live Market Stream
+                      {isEnglish ? 'Live Market Stream' : 'लाइव मंडी अपडेट'}
                     </span>
                   </div>
                 </div>
@@ -1378,7 +1507,7 @@ export default function DashboardPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
-              <span>24/7 LIVE SUPPORT</span>
+              <span>{isEnglish ? '24/7 LIVE SUPPORT' : '24/7 लाइव सपोर्ट'}</span>
             </div>
           </div>
 
@@ -1400,12 +1529,27 @@ export default function DashboardPage() {
               whileHover={{ scale: 1.01 }}
               className="w-full h-11 sm:h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs tracking-wider flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.28)] transition-all duration-300 cursor-pointer"
             >
-              <span className="font-extrabold uppercase tracking-widest text-xs">Ask Doctor</span>
+              <span className="font-extrabold uppercase tracking-widest text-xs">{isEnglish ? 'Ask Doctor' : 'डॉक्टर से पूछें'}</span>
               <ArrowUpRight size={16} className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </motion.div>
           </Link>
         </div>
       </motion.div>
+
+      {/* ── Real Location Switcher Modal ── */}
+      <LocationSwitcherModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onLocationSelected={(loc) => {
+          if (loc.lat != null && loc.lon != null) {
+            setLat(loc.lat);
+            setLon(loc.lon);
+            void fetchWeatherAndThreats(loc.lat, loc.lon);
+            const activeCrop = profile.activeCrop || profile.crops?.[0] || 'Wheat';
+            void fetchIntelligenceInsights(loc.lat, loc.lon, activeCrop);
+          }
+        }}
+      />
     </div>
   );
 }

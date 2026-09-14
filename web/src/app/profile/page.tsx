@@ -13,6 +13,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAtmosphere } from '@/context/AtmosphericContext';
 import { APP_LANGUAGES } from '@/lib/languages';
 import { formatSoilTypeLabel } from '@/lib/soil';
+import LocationSwitcherModal from '@/components/LocationSwitcherModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -86,6 +87,7 @@ export default function ProfilePage() {
   const [nameInput, setNameInput] = useState(profile.name);
   const [history, setHistory] = useState<ActivityHistory>({ scans: [], calls: [], feedback: [] });
   const [showHelp, setShowHelp] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   // ── Notification preferences ──
   const [scanAlerts, setScanAlerts] = useState(true);
@@ -189,7 +191,7 @@ export default function ProfilePage() {
 
   return (
     <div
-      className="min-h-full text-slate-900 dark:text-white pb-52 sm:pb-56 px-4 pt-4 space-y-4 relative overflow-hidden"
+      className="min-h-full text-slate-900 dark:text-white pb-6 sm:pb-8 px-4 pt-4 space-y-4 relative overflow-hidden"
       style={{
         background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16,185,129,0.12), transparent 60%), radial-gradient(circle at 90% 40%, rgba(253,186,116,0.08), transparent 50%), linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
       }}
@@ -291,12 +293,26 @@ export default function ProfilePage() {
                 )}
               </AnimatePresence>
 
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <MapPin size={12} className="text-rose-500 shrink-0" />
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">
-                  {profile.locationLabel || 'Nalanda, Bihar'}
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (navigator.vibrate) navigator.vibrate(8);
+                  setIsLocationModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 mt-1.5 text-left group cursor-pointer"
+                title="Tap to change location"
+              >
+                <MapPin size={12} className="text-rose-500 shrink-0 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate max-w-[170px]">
+                  {profile.locationLabel || (isEnglish ? 'Set your location' : 'स्थान चुनें')}
                 </span>
-              </div>
+                {profile.isApproximateLocation && (
+                  <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+                    ({isEnglish ? 'Approx' : 'अनुमानित'})
+                  </span>
+                )}
+                <Pencil size={10} className="text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+              </motion.button>
             </div>
           </div>
         </div>
@@ -859,6 +875,12 @@ export default function ProfilePage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── Location Switcher Modal ── */}
+      <LocationSwitcherModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
     </div>
   );
 }

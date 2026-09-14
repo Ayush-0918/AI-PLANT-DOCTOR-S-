@@ -7,7 +7,7 @@ import {
   Menu, X, Scan, ShoppingBag, Users, Leaf, Sparkles,
   Thermometer, FlaskConical, BookOpen, Image,
   Phone, BarChart3, Settings, History, ArrowRight,
-  Wheat, Home, BrainCircuit, HelpCircle, PhoneCall, Mail
+  Wheat, Home, BrainCircuit, HelpCircle, PhoneCall, Mail, Cpu
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAtmosphere } from '@/context/AtmosphericContext';
@@ -22,6 +22,7 @@ import { usePathname } from 'next/navigation';
 const FEATURES = [
   { id: 'sahayak',    icon: Sparkles,       label: 'Sahayak',         labelHi: 'सहायक',        href: '/assistant',  color: '#10b981', bg: '#ecfdf5' },
   { id: 'dashboard',  icon: Home,           label: 'Dashboard',       labelHi: 'डैशबोर्ड',      href: '/dashboard',   color: '#3b82f6', bg: '#eff6ff' },
+  { id: 'hardware',   icon: Cpu,            label: 'IoT Hardware',    labelHi: 'IoT सेंसर',     href: '/hardware',   color: '#10b981', bg: '#ecfdf5' },
   { id: 'scanner',    icon: Scan,           label: 'AI Scan',         labelHi: 'AI स्कैन',      href: '/scanner',    color: '#8b5cf6', bg: '#f5f3ff' },
   { id: 'market',     icon: ShoppingBag,    label: 'Kisan Bazaar',    labelHi: 'किसान बाज़ार',   href: '/marketplace',color: '#f59e0b', bg: '#fffbeb' },
   { id: 'community',  icon: Users,          label: 'Community',       labelHi: 'समुदाय',        href: '/community',  color: '#06b6d4', bg: '#ecfeff' },

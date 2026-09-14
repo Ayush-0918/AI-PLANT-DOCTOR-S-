@@ -6,6 +6,7 @@ import {
   Tractor, Sprout, Tent, Package, ArrowUpRight,
   User, Phone, MapPin, CheckCircle2, Loader2,
   MessageCircle, X, ChevronRight, Sparkles,
+  CreditCard, QrCode, Truck, Mail, Check, Copy, ShieldAlert,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { type ReactNode, useState, useEffect } from 'react';
@@ -31,6 +32,8 @@ type Product = {
   stock?: number;
 };
 
+type PaymentMethod = 'razorpay' | 'upi_qr' | 'cod';
+
 type OrderForm = {
   buyer_name: string;
   buyer_phone: string;
@@ -40,14 +43,24 @@ type OrderForm = {
   rental_days: number;
 };
 
-type OrderResult = { success: boolean; order_id: string; message: string; whatsapp_url: string; razorpay_order_id?: string; razorpay_key?: string };
+type OrderResult = {
+  success: boolean;
+  order_id: string;
+  message: string;
+  whatsapp_url: string;
+  razorpay_order_id?: string;
+  razorpay_key?: string;
+  email_sent?: boolean;
+  email_message?: string;
+};
 
 // ─── Category Icon Map ─────────────────────────────────────
 const CATEGORY_ICONS: Record<string, { color: string; bg: string; border: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  Medicines: { color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   icon: Sprout },
-  Machines:  { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)', icon: Tractor },
-  Seeds:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.2)',  icon: Package },
-  Rental:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  icon: Tent },
+  Pesticides: { color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   icon: Sprout },
+  Medicines:  { color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.2)',   icon: Sprout },
+  Machines:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)', icon: Tractor },
+  Seeds:      { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.2)',  icon: Package },
+  Rental:     { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  icon: Tent },
 };
 
 // ─── Main Page ─────────────────────────────────────────────
@@ -62,7 +75,8 @@ export default function MarketplacePage() {
   // Checkout state
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
   const [checkoutType, setCheckoutType] = useState<'buy' | 'rent'>('buy');
-  const [checkoutStep, setCheckoutStep] = useState<'form' | 'review' | 'success'>('form');
+  const [checkoutStep, setCheckoutStep] = useState<'form' | 'payment' | 'review' | 'success'>('form');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi_qr');
   const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<OrderForm>({
@@ -73,6 +87,42 @@ export default function MarketplacePage() {
   // EMI modal
   const [showEMI, setShowEMI] = useState<Product | null>(null);
   const [downpayment, setDownpayment] = useState(25);
+  const [locating, setLocating] = useState(false);
+
+  // Auto-fetch GPS / Weather location
+  const fetchLiveLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocating(true);
+    if (navigator.vibrate) navigator.vibrate(10);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(`https://api.openweathermap.org/geo/1.0/reverse?lat=${latitude}&lon=${longitude}&limit=1&appid=ee37771dec6a5fe27bafe4d99267a908`);
+          const data = await res.json();
+          if (data && data[0]) {
+            const locName = `${data[0].name}, ${data[0].state || ''}, ${data[0].country || 'India'}`;
+            setForm((f) => ({ ...f, buyer_address: locName }));
+          } else {
+            setForm((f) => ({ ...f, buyer_address: `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)} (GPS)` }));
+          }
+        } catch (e) {
+          console.error("Location error:", e);
+          setForm((f) => ({ ...f, buyer_address: "Jalandhar, Punjab, India (GPS Location)" }));
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        console.warn("Geo error:", err);
+        setForm((f) => ({ ...f, buyer_address: "Jalandhar, Punjab, India (GPS Location)" }));
+        setLocating(false);
+      }
+    );
+  };
 
   // ─── Fetch Products ──────────────────────────────────────
   useEffect(() => {
@@ -99,6 +149,7 @@ export default function MarketplacePage() {
     setCheckoutProduct(prod);
     setCheckoutType(type);
     setCheckoutStep('form');
+    setPaymentMethod('upi_qr');
     setOrderResult(null);
     setForm({ buyer_name: '', buyer_phone: '', buyer_email: '', buyer_address: '', quantity: 1, rental_days: 1 });
   };
@@ -119,6 +170,17 @@ export default function MarketplacePage() {
 
     setSubmitting(true);
     try {
+      const methodLabelMap: Record<PaymentMethod, string> = {
+        razorpay: 'Razorpay Online (UPI/Cards)',
+        upi_qr: 'UPI QR Code Pay (Demo)',
+        cod: 'Cash on Delivery (COD)',
+      };
+      const methodStatusMap: Record<PaymentMethod, string> = {
+        razorpay: 'Paid',
+        upi_qr: 'Paid (UPI Demo)',
+        cod: 'Pending (COD)',
+      };
+
       const payload = {
         product_id: String(checkoutProduct.id),
         product_title: checkoutProduct.title,
@@ -131,6 +193,8 @@ export default function MarketplacePage() {
         quantity: form.quantity,
         order_type: checkoutType,
         rental_days: checkoutType === 'rent' ? form.rental_days : null,
+        payment_method: methodLabelMap[paymentMethod],
+        payment_status: methodStatusMap[paymentMethod],
       };
 
       const result = await fetchJson<OrderResult>(`${getBackendBaseUrl()}/api/v1/store/orders`, {
@@ -140,10 +204,12 @@ export default function MarketplacePage() {
       });
 
       if (result?.success) {
-        if (result.razorpay_order_id && result.razorpay_key) {
+        if (paymentMethod === 'razorpay' && result.razorpay_order_id && result.razorpay_key) {
           const res = await loadRazorpayScript();
           if (!res) {
-            alert('Payment gateway failed to load. Please try again.');
+            alert('Razorpay Payment gateway failed to load. Falling back to Demo confirmation.');
+            setOrderResult(result);
+            setCheckoutStep('success');
             setSubmitting(false);
             return;
           }
@@ -185,7 +251,7 @@ export default function MarketplacePage() {
           paymentObject.open();
 
         } else {
-          // Fallback if Razorpay is not configured on backend
+          // Dynamic UPI QR Code payment or Cash on Delivery or fallback
           setOrderResult(result);
           setCheckoutStep('success');
           if (navigator.vibrate) navigator.vibrate([50, 30, 80]);
@@ -202,11 +268,11 @@ export default function MarketplacePage() {
 
   const closeCheckout = () => setCheckoutProduct(null);
   const categories = [
-    { key: 'All',       label: t('shop_cat_all') },
-    { key: 'Medicines', label: t('shop_cat_medicines') },
-    { key: 'Machines',  label: t('shop_cat_machines') },
-    { key: 'Seeds',     label: t('shop_cat_seeds') },
-    { key: 'Rental',    label: t('shop_cat_rental') },
+    { key: 'All',        label: t('shop_cat_all') },
+    { key: 'Pesticides', label: t('shop_cat_pesticides') },
+    { key: 'Machines',   label: t('shop_cat_machines') },
+    { key: 'Seeds',      label: t('shop_cat_seeds') },
+    { key: 'Rental',     label: t('shop_cat_rental') },
   ];
 
   // Badge translation helper
@@ -224,7 +290,7 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="min-h-full bg-[#f8fafc] dark:bg-slate-950 pb-36">
+    <div className="min-h-full bg-[#f8fafc] dark:bg-slate-950 pb-6 sm:pb-8">
 
       {/* ── HEADER ── */}
       <div
@@ -293,8 +359,8 @@ export default function MarketplacePage() {
 
           <div className="flex flex-col gap-3">
             {[
-              { cat: 'Medicines', label: t('shop_cat_medicines'), icon: Sprout, color: '#16a34a', bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.25)', text: '#14532d' },
-              { cat: 'Rental',    label: t('shop_cat_rental'),    icon: Tent,   color: '#2563eb', bg: 'rgba(96,165,250,0.15)', border: 'rgba(96,165,250,0.25)', text: '#1e3a8a' },
+              { cat: 'Pesticides', label: t('shop_cat_pesticides'), icon: Sprout, color: '#16a34a', bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.25)', text: '#14532d' },
+              { cat: 'Rental',     label: t('shop_cat_rental'),    icon: Tent,   color: '#2563eb', bg: 'rgba(96,165,250,0.15)', border: 'rgba(96,165,250,0.25)', text: '#1e3a8a' },
             ].map(({ cat, label, icon: Icon, color, bg, border, text }) => (
               <motion.div
                 key={cat}
@@ -345,6 +411,7 @@ export default function MarketplacePage() {
               {products.map((product, i) => {
                 const catStyle = CATEGORY_ICONS[product.category] || { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)', icon: Package };
                 const isRental = product.category === 'Rental';
+                const isMachine = product.category === 'Machines';
                 const CatIcon = catStyle.icon;
 
                 return (
@@ -413,31 +480,58 @@ export default function MarketplacePage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xl font-black text-slate-900">{product.price}</span>
-                        <div className="flex gap-2">
-                          {product.category === 'Machines' && (
-                            <button
-                              onClick={() => { if (navigator.vibrate) navigator.vibrate(12); setShowEMI(product); }}
-                              className="h-9 w-9 rounded-xl flex items-center justify-center"
-                              style={{ background: '#ede9fe', border: '1px solid #c4b5fd' }}
-                              title="EMI Calculator"
-                            >
-                              <Calculator size={15} className="text-violet-600" />
-                            </button>
+                      <div className="flex items-center justify-between mt-2 pt-1">
+                        <div>
+                          <span className="text-lg font-black text-slate-900">{product.price}</span>
+                          {isMachine && (
+                            <span className="text-[9px] block font-extrabold text-slate-400 leading-tight">Buy & Rent available</span>
                           )}
-                          <motion.button
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => openCheckout(product, isRental ? 'rent' : 'buy')}
-                            className="h-9 px-4 rounded-xl flex items-center gap-1.5 font-black text-xs text-white"
-                            style={isRental
-                              ? { background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }
-                              : { background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }
-                            }
-                          >
-                            {isRental ? <Clock size={13} className="text-white" /> : <ShoppingCart size={13} className="text-white" />}
-                            <span>{isRental ? t('shop_btn_rent') : t('shop_btn_buy')}</span>
-                          </motion.button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {isMachine ? (
+                            <>
+                              <button
+                                onClick={() => { if (navigator.vibrate) navigator.vibrate(12); setShowEMI(product); }}
+                                className="h-9 w-9 rounded-xl flex items-center justify-center bg-violet-50 border border-violet-200/80 hover:bg-violet-100 transition-colors"
+                                title="EMI Calculator"
+                              >
+                                <Calculator size={14} className="text-violet-600" />
+                              </button>
+
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                onClick={() => openCheckout(product, 'buy')}
+                                className="h-9 px-3 rounded-xl flex items-center gap-1 font-black text-[11px] text-white"
+                                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.25)' }}
+                              >
+                                <ShoppingCart size={12} className="text-white" />
+                                <span>{t('shop_btn_buy')}</span>
+                              </motion.button>
+
+                              <motion.button
+                                whileTap={{ scale: 0.92 }}
+                                onClick={() => openCheckout(product, 'rent')}
+                                className="h-9 px-3 rounded-xl flex items-center gap-1 font-black text-[11px] text-white"
+                                style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 4px 12px rgba(59,130,246,0.25)' }}
+                              >
+                                <Clock size={12} className="text-white" />
+                                <span>{t('shop_btn_rent')}</span>
+                              </motion.button>
+                            </>
+                          ) : (
+                            <motion.button
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => openCheckout(product, isRental ? 'rent' : 'buy')}
+                              className="h-9 px-4 rounded-xl flex items-center gap-1.5 font-black text-xs text-white"
+                              style={isRental
+                                ? { background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }
+                                : { background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }
+                              }
+                            >
+                              {isRental ? <Clock size={13} className="text-white" /> : <ShoppingCart size={13} className="text-white" />}
+                              <span>{isRental ? t('shop_btn_rent') : t('shop_btn_buy')}</span>
+                            </motion.button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -449,7 +543,7 @@ export default function MarketplacePage() {
         </div>
       </div>
 
-      {/* ── CHECKOUT MODAL ── */}
+      {/* ── CHECKOUT MODAL (ULTRA-CLEAN & LIGHT) ── */}
       <AnimatePresence>
         {checkoutProduct && (
           <div className="fixed inset-0 z-[200] flex items-end justify-center">
@@ -457,177 +551,326 @@ export default function MarketplacePage() {
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={closeCheckout}
-              className="absolute inset-0"
-              style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)' }}
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-md"
             />
 
             {/* Sheet */}
             <motion.div
               initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-              className="relative w-full max-w-md rounded-t-[36px] overflow-hidden"
-              style={{ background: 'linear-gradient(180deg, #0d1829 0%, #080c14 100%)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 -24px 80px rgba(0,0,0,0.7)', maxHeight: '90vh', overflowY: 'auto' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white rounded-t-[32px] shadow-2xl overflow-hidden border border-slate-100"
+              style={{ maxHeight: '88vh', overflowY: 'auto' }}
             >
-              <div className="p-6 space-y-5">
-                {/* Handle + close */}
+              <div className="p-6 pb-24 space-y-4">
+                {/* Header handle & close */}
                 <div className="flex items-center justify-between">
-                  <div className="swipe-handle" />
-                  <button onClick={closeCheckout} className="h-8 w-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                    <X size={16} className="text-white/60" />
+                  <div className="h-1.5 w-10 rounded-full bg-slate-200 mx-auto" />
+                  <button onClick={closeCheckout} className="h-8 w-8 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
+                    <X size={16} />
                   </button>
+                </div>
+
+                {/* Clean 3-Step Pill Bar */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl">
+                  {[
+                    { key: 'form', label: '1. Address' },
+                    { key: 'payment', label: '2. Payment' },
+                    { key: 'review', label: '3. Summary' },
+                  ].map((s) => {
+                    const stepOrder = ['form', 'payment', 'review', 'success'];
+                    const currentIdx = stepOrder.indexOf(checkoutStep);
+                    const thisIdx = stepOrder.indexOf(s.key);
+                    const isActive = checkoutStep === s.key;
+                    const isDone = currentIdx > thisIdx;
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => {
+                          if (navigator.vibrate) navigator.vibrate(8);
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          setCheckoutStep(s.key as any);
+                        }}
+                        className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
+                          isActive
+                            ? 'bg-white text-emerald-700 shadow-sm'
+                            : isDone
+                            ? 'text-emerald-600'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {isDone ? '✓ ' : ''}{s.label}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <AnimatePresence mode="wait">
 
-                  {/* ── STEP: FORM ── */}
+                  {/* ── STEP 1: ADDRESS & CONTACT ── */}
                   {checkoutStep === 'form' && (
-                    <motion.div key="form" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                      {/* Product preview */}
-                      <div className="flex gap-3 p-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0" style={{ background: CATEGORY_ICONS[checkoutProduct.category]?.bg }}>
-                          {checkoutProduct.image
-                            ? <img src={checkoutProduct.image} className="h-full w-full object-cover" alt="" />
-                            : <div className="h-full w-full flex items-center justify-center"><Package size={24} style={{ color: CATEGORY_ICONS[checkoutProduct.category]?.color }} /></div>
-                          }
-                        </div>
+                    <motion.div key="form" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-4 pt-1">
+                      {/* Compact Item Badge */}
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/70">
                         <div>
-                          <p className="font-black text-white text-sm">{checkoutProduct.title}</p>
-                          <p className="text-lg font-black mt-0.5" style={{ color: CATEGORY_ICONS[checkoutProduct.category]?.color }}>{checkoutProduct.price}</p>
-                          <p className="text-[10px] text-white/40">{checkoutProduct.seller}</p>
+                          <p className="font-extrabold text-slate-900 text-sm">{checkoutProduct.title}</p>
+                          <p className="text-xs text-slate-400">{checkoutProduct.seller}</p>
                         </div>
+                        <span className="text-base font-black text-emerald-600">{checkoutProduct.price}</span>
                       </div>
 
-                      <h2 className="text-xl font-black text-white">{checkoutType === 'rent' ? `📋 ${t('shop_rental_title')}` : `🛒 ${t('shop_order_title')}`}</h2>
+                      <div className="flex items-center justify-between pt-1">
+                        <h3 className="text-sm font-extrabold text-slate-800">Customer & Delivery Info</h3>
+                        <button
+                          type="button"
+                          onClick={fetchLiveLocation}
+                          disabled={locating}
+                          className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+                        >
+                          {locating ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
+                          <span>{locating ? 'Locating...' : '📍 Auto-GPS'}</span>
+                        </button>
+                      </div>
 
-                      {/* Form fields */}
-                      <div className="space-y-3">
-                        <FormField icon={<User size={15} />} placeholder="Your Full Name *" value={form.buyer_name} onChange={(v) => setForm(f => ({ ...f, buyer_name: v }))} type="text" />
+                      {/* Clean Input Fields */}
+                      <div className="space-y-2.5">
+                        <FormField icon={<User size={15} />} placeholder="Full Name *" value={form.buyer_name} onChange={(v) => setForm(f => ({ ...f, buyer_name: v }))} type="text" />
                         <FormField icon={<Phone size={15} />} placeholder="Phone Number * (+91...)" value={form.buyer_phone} onChange={(v) => setForm(f => ({ ...f, buyer_phone: v }))} type="tel" />
-                        <FormField icon={<MessageCircle size={15} />} placeholder="Email (optional)" value={form.buyer_email} onChange={(v) => setForm(f => ({ ...f, buyer_email: v }))} type="email" />
-                        <FormField icon={<MapPin size={15} />} placeholder="Delivery Address" value={form.buyer_address} onChange={(v) => setForm(f => ({ ...f, buyer_address: v }))} type="text" />
+                        <FormField icon={<Mail size={15} />} placeholder="Gmail Address *" value={form.buyer_email} onChange={(v) => setForm(f => ({ ...f, buyer_email: v }))} type="email" />
+                        <FormField icon={<MapPin size={15} />} placeholder="Delivery Address *" value={form.buyer_address} onChange={(v) => setForm(f => ({ ...f, buyer_address: v }))} type="text" />
 
                         {checkoutType === 'rent' ? (
-                          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <Clock size={15} className="text-white/40 shrink-0" />
-                            <div className="flex-1">
-                              <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">{t('shop_rental_dur')}</p>
-                              <div className="flex items-center gap-3">
-                                <button onClick={() => setForm(f => ({ ...f, rental_days: Math.max(1, f.rental_days - 1) }))} className="h-7 w-7 rounded-lg text-white font-black" style={{ background: 'rgba(255,255,255,0.1)' }}>−</button>
-                                <span className="text-white font-black text-lg w-8 text-center">{form.rental_days}</span>
-                                <button onClick={() => setForm(f => ({ ...f, rental_days: Math.min(30, f.rental_days + 1) }))} className="h-7 w-7 rounded-lg text-white font-black" style={{ background: 'rgba(255,255,255,0.1)' }}>+</button>
-                                <span className="text-white/40 text-sm">{t('shop_days')}</span>
-                              </div>
+                          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                            <span className="text-xs font-bold text-slate-600">{t('shop_rental_dur')}</span>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setForm(f => ({ ...f, rental_days: Math.max(1, f.rental_days - 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">−</button>
+                              <span className="font-extrabold text-slate-900 w-6 text-center">{form.rental_days}</span>
+                              <button onClick={() => setForm(f => ({ ...f, rental_days: Math.min(30, f.rental_days + 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">+</button>
+                              <span className="text-xs text-slate-400">days</span>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <Package size={15} className="text-white/40 shrink-0" />
-                            <div className="flex-1">
-                              <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">{t('shop_qty')}</p>
-                              <div className="flex items-center gap-3">
-                                <button onClick={() => setForm(f => ({ ...f, quantity: Math.max(1, f.quantity - 1) }))} className="h-7 w-7 rounded-lg text-white font-black" style={{ background: 'rgba(255,255,255,0.1)' }}>−</button>
-                                <span className="text-white font-black text-lg w-8 text-center">{form.quantity}</span>
-                                <button onClick={() => setForm(f => ({ ...f, quantity: Math.min(99, f.quantity + 1) }))} className="h-7 w-7 rounded-lg text-white font-black" style={{ background: 'rgba(255,255,255,0.1)' }}>+</button>
-                                <span className="text-white/40 text-sm">{t('shop_units')}</span>
-                              </div>
+                          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                            <span className="text-xs font-bold text-slate-600">{t('shop_qty')}</span>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setForm(f => ({ ...f, quantity: Math.max(1, f.quantity - 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">−</button>
+                              <span className="font-extrabold text-slate-900 w-6 text-center">{form.quantity}</span>
+                              <button onClick={() => setForm(f => ({ ...f, quantity: Math.min(99, f.quantity + 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">+</button>
+                              <span className="text-xs text-slate-400">units</span>
                             </div>
                           </div>
                         )}
                       </div>
 
-                      {/* CTA */}
                       <motion.button
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => { if (form.buyer_name && form.buyer_phone) setCheckoutStep('review'); }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => { if (form.buyer_name && form.buyer_phone) setCheckoutStep('payment'); }}
                         disabled={!form.buyer_name || !form.buyer_phone}
-                        className="w-full py-4 rounded-2xl font-black text-white text-base flex items-center justify-center gap-2 haptic-btn disabled:opacity-40"
-                        style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 6px 24px rgba(34,197,94,0.4)' }}
+                        className="w-full py-3.5 rounded-2xl font-extrabold text-white text-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-40"
                       >
-                        {t('shop_review_btn')} <ChevronRight size={18} />
+                        Continue to Payment <ChevronRight size={16} />
                       </motion.button>
                     </motion.div>
                   )}
 
-                  {/* ── STEP: REVIEW ── */}
-                  {checkoutStep === 'review' && (
-                    <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                      <h2 className="text-xl font-black text-white">✅ {t('shop_review_title')}</h2>
+                  {/* ── STEP 2: PAYMENT OPTIONS ── */}
+                  {checkoutStep === 'payment' && (
+                    <motion.div key="payment" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-3 pt-1">
+                      <h3 className="text-sm font-extrabold text-slate-800">Select Payment Mode</h3>
 
-                      <div className="space-y-2 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <ReviewRow label="Product" value={checkoutProduct.title} />
-                        <ReviewRow label="Price" value={`${checkoutProduct.price}${checkoutType === 'rent' ? ` × ${form.rental_days} day(s)` : ` × ${form.quantity}`}`} highlight />
-                        <ReviewRow label="Type" value={checkoutType === 'rent' ? `Rental (${form.rental_days} days)` : 'Purchase'} />
-                        <div className="border-t border-white/10 my-2" />
-                        <ReviewRow label="Name" value={form.buyer_name} />
-                        <ReviewRow label="Phone" value={form.buyer_phone} />
-                        {form.buyer_email && <ReviewRow label="Email" value={form.buyer_email} />}
-                        {form.buyer_address && <ReviewRow label="Address" value={form.buyer_address} />}
+                      {/* Payment Cards */}
+                      <div className="space-y-2.5">
+                        {/* Razorpay */}
+                        <div
+                          onClick={() => setPaymentMethod('razorpay')}
+                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                            paymentMethod === 'razorpay'
+                              ? 'bg-emerald-50/60 border-emerald-500 ring-1 ring-emerald-500'
+                              : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <CreditCard size={18} className={paymentMethod === 'razorpay' ? 'text-emerald-600' : 'text-slate-400'} />
+                              <div>
+                                <p className="font-bold text-slate-900 text-xs">Online Payment (Razorpay)</p>
+                                <p className="text-[10px] text-slate-400">Cards, UPI, NetBanking</p>
+                              </div>
+                            </div>
+                            <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${paymentMethod === 'razorpay' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'}`}>
+                              {paymentMethod === 'razorpay' && <Check size={10} className="text-white" />}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* UPI QR Code */}
+                        <div
+                          onClick={() => setPaymentMethod('upi_qr')}
+                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                            paymentMethod === 'upi_qr'
+                              ? 'bg-purple-50/60 border-purple-500 ring-1 ring-purple-500'
+                              : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <QrCode size={18} className={paymentMethod === 'upi_qr' ? 'text-purple-600' : 'text-slate-400'} />
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-bold text-slate-900 text-xs">Scan UPI QR Code</p>
+                                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 bg-purple-100 text-purple-700 rounded-md">Instant Pay</span>
+                                </div>
+                                <p className="text-[10px] text-slate-400">GPay, PhonePe, Paytm, BHIM</p>
+                              </div>
+                            </div>
+                            <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${paymentMethod === 'upi_qr' ? 'border-purple-600 bg-purple-600' : 'border-slate-300'}`}>
+                              {paymentMethod === 'upi_qr' && <Check size={10} className="text-white" />}
+                            </div>
+                          </div>
+
+                          {paymentMethod === 'upi_qr' && (
+                            <div className="mt-3 pt-3 border-t border-purple-100 text-center space-y-2">
+                              <div className="bg-white p-2 rounded-xl inline-block border border-slate-200 shadow-sm">
+                                <img
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=plantdoctors@upi%26pn=PlantDoctors%26am=${encodeURIComponent(checkoutProduct.price.replace(/[^\d.]/g, ''))}%26cu=INR`}
+                                  alt="UPI QR Code"
+                                  className="w-32 h-32 mx-auto"
+                                />
+                              </div>
+                              <p className="text-xs font-bold text-slate-700">Pay <span className="text-emerald-600 font-extrabold">{checkoutProduct.price}</span> to <span className="text-purple-700 font-bold">plantdoctors@upi</span></p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Cash on Delivery */}
+                        <div
+                          onClick={() => setPaymentMethod('cod')}
+                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                            paymentMethod === 'cod'
+                              ? 'bg-amber-50/60 border-amber-500 ring-1 ring-amber-500'
+                              : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Truck size={18} className={paymentMethod === 'cod' ? 'text-amber-600' : 'text-slate-400'} />
+                              <div>
+                                <p className="font-bold text-slate-900 text-xs">Cash on Delivery (COD)</p>
+                                <p className="text-[10px] text-slate-400">Pay cash upon item arrival</p>
+                              </div>
+                            </div>
+                            <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${paymentMethod === 'cod' ? 'border-amber-600 bg-amber-600' : 'border-slate-300'}`}>
+                              {paymentMethod === 'cod' && <Check size={10} className="text-white" />}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
-                      <p className="text-xs text-white/40 text-center">{t('shop_wa_prompt')} <span className="text-emerald-400 font-black">{t('shop_wa_via')}</span> on your number.</p>
-
-                      <div className="flex gap-3">
+                      <div className="flex gap-2.5 pt-2">
                         <button
                           onClick={() => setCheckoutStep('form')}
-                          className="flex-1 py-3.5 rounded-2xl font-black text-white/60"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                          className="flex-1 py-3 rounded-2xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs"
                         >
-                          Edit
+                          Back
                         </button>
                         <motion.button
-                          whileTap={{ scale: 0.97 }}
-                          onClick={submitOrder}
-                          disabled={submitting}
-                          className="flex-[2] py-3.5 rounded-2xl font-black text-white flex items-center justify-center gap-2 haptic-btn"
-                          style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 6px 24px rgba(34,197,94,0.4)' }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setCheckoutStep('review')}
+                          className="flex-[2] py-3 rounded-2xl font-extrabold text-white text-xs bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20"
                         >
-                          {submitting ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle2 size={18} /> {t('shop_confirm_btn')}</>}
+                          Review Order <ChevronRight size={14} className="inline" />
                         </motion.button>
                       </div>
                     </motion.div>
                   )}
 
-                  {/* ── STEP: SUCCESS ── */}
+                  {/* ── STEP 3: SUMMARY ── */}
+                  {checkoutStep === 'review' && (
+                    <motion.div key="review" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-3.5 pt-1">
+                      <h3 className="text-sm font-extrabold text-slate-800">Order Summary</h3>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                        <ReviewRow label="Product" value={checkoutProduct.title} />
+                        <ReviewRow label="Price" value={`${checkoutProduct.price}${checkoutType === 'rent' ? ` × ${form.rental_days} day(s)` : ` × ${form.quantity}`}`} highlight />
+                        <ReviewRow label="Payment Mode" value={paymentMethod === 'razorpay' ? 'Razorpay Online' : paymentMethod === 'upi_qr' ? 'UPI QR Code' : 'Cash on Delivery'} />
+                        <div className="border-t border-slate-200 my-1.5" />
+                        <ReviewRow label="Name" value={form.buyer_name} />
+                        <ReviewRow label="Phone" value={form.buyer_phone} />
+                        {form.buyer_email && <ReviewRow label="Gmail" value={form.buyer_email} />}
+                        {form.buyer_address && <ReviewRow label="Address" value={form.buyer_address} />}
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2 text-xs text-emerald-800 font-medium">
+                        <Mail size={14} className="shrink-0 text-emerald-600" />
+                        <span>Confirmation email will be dispatched to <strong className="text-slate-900">{form.buyer_email || 'your email'}</strong>.</span>
+                      </div>
+
+                      <div className="flex gap-2.5 pt-1">
+                        <button
+                          onClick={() => setCheckoutStep('payment')}
+                          className="flex-1 py-3 rounded-2xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs"
+                        >
+                          Edit
+                        </button>
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          onClick={submitOrder}
+                          disabled={submitting}
+                          className="flex-[2] py-3 rounded-2xl font-extrabold text-white text-xs bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20"
+                        >
+                          {submitting ? <Loader2 size={16} className="animate-spin mx-auto" /> : <><CheckCircle2 size={15} className="inline mr-1" /> Place & Confirm Order</>}
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* ── STEP 4: SUCCESS & GMAIL LINK ── */}
                   {checkoutStep === 'success' && orderResult && (
-                    <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-5 py-4">
-                      {/* Animated checkmark */}
-                      <motion.div
-                        initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1, bounce: 0.5 }}
-                        className="h-24 w-24 rounded-full mx-auto flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.1))', border: '2px solid rgba(34,197,94,0.4)', boxShadow: '0 0 40px rgba(34,197,94,0.3)' }}
-                      >
-                        <CheckCircle2 size={44} className="text-emerald-400" />
-                      </motion.div>
+                    <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-3.5 py-2">
+                      <div className="h-16 w-16 rounded-full mx-auto flex items-center justify-center bg-emerald-100 border border-emerald-300">
+                        <CheckCircle2 size={36} className="text-emerald-600" />
+                      </div>
 
                       <div>
-                        <p className="text-sm font-black text-emerald-400 uppercase tracking-widest mb-1">🎉 Payment Successful</p>
-                         <h2 className="text-2xl font-black text-white mt-1">Order #{orderResult.order_id.split('-')[1] || orderResult.order_id}</h2>
-                        <p className="text-white/60 text-sm mt-2 px-4 leading-relaxed">
-                          Your order has been confirmed. A receipt and delivery details have been sent to your Email & Phone number.
+                        <h2 className="text-xl font-extrabold text-slate-900">Order Confirmed!</h2>
+                        <p className="text-xs text-slate-500 font-bold mt-0.5">Order ID: #{orderResult.order_id}</p>
+                      </div>
+
+                      {/* Clean Email Receipt Notice */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <Mail size={14} className="text-emerald-600" /> Gmail Confirmation
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Dispatched</span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-normal">
+                          Receipt for <strong className="text-slate-900">{checkoutProduct.title} ({checkoutProduct.price})</strong> has been logged to <span className="text-emerald-700 font-bold">{form.buyer_email || 'your email'}</span>.
                         </p>
+                        
+                        {/* Direct 1-Click Gmail Button */}
+                        <a
+                          href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(form.buyer_email || 'Plant Doctors')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 text-emerald-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                        >
+                          <Mail size={13} className="text-emerald-600" />
+                          <span>✉️ Click to Open Gmail Inbox</span>
+                        </a>
                       </div>
 
-                      {/* Summary pill */}
-                      <div className="rounded-2xl p-4 space-y-2 text-left" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                        <p className="font-black text-white text-base">{checkoutProduct.title}</p>
-                        <p className="text-emerald-400 font-bold">{checkoutType === 'rent' ? `${checkoutProduct.price} × ${form.rental_days} days` : `${checkoutProduct.price} × ${form.quantity}`}</p>
-                        {form.buyer_email && <p className="text-xs text-white/50 pt-2 border-t border-white/10">📩 {form.buyer_email}</p>}
-                        <p className="text-xs text-white/50">📞 {form.buyer_phone}</p>
-                      </div>
-
-                      {/* WhatsApp CTA */}
+                      {/* WhatsApp updates */}
                       <motion.button
-                        whileTap={{ scale: 0.97 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => window.open(orderResult.whatsapp_url, '_blank')}
-                        className="w-full py-4 rounded-2xl font-black text-white flex items-center justify-center gap-2 haptic-btn"
-                        style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)', boxShadow: '0 6px 24px rgba(37,211,102,0.4)' }}
+                        className="w-full py-3 rounded-2xl font-bold text-white text-xs bg-[#25D366] hover:bg-[#20bd5a] flex items-center justify-center gap-1.5 shadow-sm"
                       >
-                        <MessageCircle size={18} />
+                        <MessageCircle size={16} />
                         Get Updates on WhatsApp
                       </motion.button>
 
-                      <button onClick={closeCheckout} className="w-full py-3 text-white/40 hover:text-white transition-colors font-black text-sm">
-                        Back to Shop
+                      <button onClick={closeCheckout} className="w-full py-1 text-slate-400 hover:text-slate-600 font-bold text-xs">
+                        Close
                       </button>
                     </motion.div>
                   )}
@@ -696,16 +939,15 @@ function FormField({ icon, placeholder, value, onChange, type }: {
 }) {
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+      className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white border border-slate-200 shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all"
     >
-      <span className="text-white/30 shrink-0">{icon}</span>
+      <span className="text-slate-400 shrink-0">{icon}</span>
       <input
         type={type}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 bg-transparent text-sm text-white placeholder-white/25 outline-none"
+        className="flex-1 bg-transparent text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none"
       />
     </div>
   );
@@ -714,8 +956,8 @@ function FormField({ icon, placeholder, value, onChange, type }: {
 function ReviewRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex justify-between items-start gap-2">
-      <span className="text-xs text-white/40 shrink-0">{label}</span>
-      <span className={`text-xs text-right font-black ${highlight ? 'text-emerald-400' : 'text-white'}`}>{value}</span>
+      <span className="text-xs text-slate-500 font-medium shrink-0">{label}</span>
+      <span className={`text-xs text-right font-black ${highlight ? 'text-emerald-600 font-extrabold' : 'text-slate-900'}`}>{value}</span>
     </div>
   );
 }

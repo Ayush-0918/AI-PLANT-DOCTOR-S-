@@ -1,4 +1,8 @@
+import logging
+import os
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase  # type: ignore[import]
@@ -21,14 +25,26 @@ async def init_database() -> bool:
         _database = None
         return False
     try:
-        # Only use TLS if URI indicates it's a remote/secure connection
-        use_tls = "mongodb+srv" in settings.mongo_uri or "ssl=true" in settings.mongo_uri.lower() or "tls=true" in settings.mongo_uri.lower()
-        
+        is_production = settings.app_env.strip().lower() == "production"
+        use_tls = is_production or ("mongodb+srv" in settings.mongo_uri or "ssl=true" in settings.mongo_uri.lower() or "tls=true" in settings.mongo_uri.lower())
+
+        client_kwargs = {
+            "serverSelectionTimeoutMS": 3000,
+        }
+        if is_production:
+            # STRICT PRODUCTION GUARANTEE:
+            # 1. TLS is unconditionally enforced
+            # 2. Invalid certificates are strictly forbidden (proper CA chain verification)
+            client_kwargs["tls"] = True
+            client_kwargs["tlsAllowInvalidCertificates"] = False
+        elif use_tls:
+            client_kwargs["tls"] = True
+            allow_invalid_dev = os.getenv("MONGO_TLS_ALLOW_INVALID", "").lower() in {"true", "1"}
+            client_kwargs["tlsAllowInvalidCertificates"] = allow_invalid_dev
+
         _mongo_client = AsyncIOMotorClient(
             settings.mongo_uri,
-            serverSelectionTimeoutMS=3000,
-            tls=use_tls,
-            tlsAllowInvalidCertificates=use_tls,
+            **client_kwargs,
         )
         await _mongo_client.admin.command("ping")
         _database = _mongo_client["plant_doctor"]

@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-import app.services.ai_inference_service as inference_service
+import app.services.diagnosis.ai_inference_service as inference_service
 
 
 class FakeModel:

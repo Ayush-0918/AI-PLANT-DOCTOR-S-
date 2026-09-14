@@ -133,7 +133,12 @@ def _save_products_fallback(products: List[Dict[str, Any]]) -> None:
 
 def _matches_product_filters(product: Dict[str, Any], category: Optional[str], search: Optional[str]) -> bool:
     if category and category != "All":
-        if str(product.get("category", "")).lower() != category.lower():
+        prod_cat = str(product.get("category", "")).lower()
+        target_cat = category.lower()
+        if target_cat in ["pesticides", "medicines"]:
+            if prod_cat not in ["pesticides", "medicines"]:
+                return False
+        elif prod_cat != target_cat:
             return False
     if search:
         query_parts = [p.lower() for p in search.split() if len(p) > 2]
@@ -160,6 +165,9 @@ def _find_plan(plan_code: str) -> Dict[str, Any]:
     raise ValidationError("Invalid subscription plan code.")
 
 
+from app.services.email_service import send_order_confirmation_email
+
+
 class PlaceOrderRequest(BaseModel):
     product_id: str = Field(..., min_length=2, max_length=80, description="Product identifier")
     product_title: str = Field(..., min_length=2, max_length=120)
@@ -172,6 +180,8 @@ class PlaceOrderRequest(BaseModel):
     quantity: int = Field(default=1, ge=1, le=100)
     order_type: Literal["buy", "rent"] = Field(default="buy")
     rental_days: Optional[int] = Field(default=None, ge=1, le=365)
+    payment_method: Optional[str] = Field(default="Razorpay Online", max_length=50)
+    payment_status: Optional[str] = Field(default="Paid", max_length=50)
 
 
 class ProductCreateRequest(BaseModel):
@@ -194,6 +204,8 @@ class OrderResponse(BaseModel):
     whatsapp_url: str
     razorpay_order_id: Optional[str] = None
     razorpay_key: Optional[str] = None
+    email_sent: bool = False
+    email_message: Optional[str] = None
 
 
 @router.post("/upload")
@@ -247,7 +259,10 @@ async def get_products(
     if db is not None:
         query: Dict[str, Any] = {}
         if category and category != "All":
-            query["category"] = {"$regex": f"^{category}$", "$options": "i"}
+            if category.lower() in ["pesticides", "medicines"]:
+                query["category"] = {"$regex": "^(pesticides|medicines)$", "$options": "i"}
+            else:
+                query["category"] = {"$regex": f"^{category}$", "$options": "i"}
         if search:
             query_parts = [p for p in search.split() if len(p) > 2]
             if not query_parts:
@@ -305,6 +320,9 @@ async def place_order(req: PlaceOrderRequest):
         except Exception as exc:
             logger.error("Razorpay Order Error: %s", exc)
 
+    payment_method = req.payment_method or "Razorpay Online"
+    payment_status = req.payment_status or "Paid"
+
     order_doc = {
         "order_id": order_id,
         "product_id": req.product_id,
@@ -318,6 +336,8 @@ async def place_order(req: PlaceOrderRequest):
         "quantity": req.quantity,
         "order_type": req.order_type,
         "rental_days": req.rental_days,
+        "payment_method": payment_method,
+        "payment_status": payment_status,
         "status": "confirmed",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -335,11 +355,33 @@ async def place_order(req: PlaceOrderRequest):
         f"Order ID: {order_id}\n"
         f"Product: {req.product_title}\n"
         f"Price: {req.product_price}\n"
-        f"Action: {action}\n"
+        f"Payment: {payment_status} via {payment_method}\n"
         f"Buyer: {req.buyer_name} ({req.buyer_phone})"
     )
     wa_encoded = wa_text.replace(" ", "%20").replace("\n", "%0A")
     whatsapp_url = f"https://wa.me/919876543210?text={wa_encoded}"
+
+    # Dispatch email notification if buyer_email provided
+    email_res = {"sent": False, "message": None}
+    if req.buyer_email and "@" in req.buyer_email:
+        raw_num = re.sub(r"[^\d.]", "", str(req.product_price or "0"))
+        unit_price_float = float(raw_num) if raw_num else 0.0
+        total_price_formatted = f"₹{int(unit_price_float * req.quantity):,}" if unit_price_float > 0 else req.product_price
+
+        email_dispatch = send_order_confirmation_email(
+            buyer_email=req.buyer_email.strip(),
+            buyer_name=req.buyer_name.strip(),
+            order_id=order_id,
+            product_title=req.product_title,
+            product_price=req.product_price,
+            quantity=req.quantity,
+            total_amount=total_price_formatted,
+            payment_method=payment_method,
+            payment_status=payment_status,
+            buyer_address=req.buyer_address,
+        )
+        email_res["sent"] = email_dispatch.get("sent", False)
+        email_res["message"] = f"Confirmation email sent to {req.buyer_email.strip()}"
 
     return OrderResponse(
         success=True,
@@ -348,6 +390,8 @@ async def place_order(req: PlaceOrderRequest):
         whatsapp_url=whatsapp_url,
         razorpay_order_id=razorpay_order_id,
         razorpay_key=RAZORPAY_KEY,
+        email_sent=email_res["sent"],
+        email_message=email_res["message"],
     )
 
 

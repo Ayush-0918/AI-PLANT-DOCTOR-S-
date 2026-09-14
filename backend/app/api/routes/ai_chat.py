@@ -48,9 +48,33 @@ class NormalizedChatResponse(BaseModel):
 
 
 MANDI_QUERY_KEYWORDS = [
-    "mandi", "rate", "price", "bhav", "bhaav", "dam", "bikri", "bechna", "sell", "market",
-    "मंडी", "भाव", "दाम", "बिक्री", "बेचना", "बाजार", "कीमत", "मंडी भाव", "ਮੰਡੀ", "ਭਾਅ"
+    "mandi", "rate", "price", "bhav", "bhaav", "dam", "daam", "bikri", "bechna", "sell", "market", "ret",
+    "मंडी", "भाव", "दाम", "बिक्री", "बेचना", "बाजार", "कीमत", "रेट", "मंडी भाव", "ਮੰਡੀ", "ਭਾਅ"
 ]
+
+CROP_MAP = {
+    "wheat": "Wheat", "gehu": "Wheat", "gehun": "Wheat", "गेहूं": "Wheat", "गेहूँ": "Wheat", "ਕਣਕ": "Wheat",
+    "rice": "Rice", "paddy": "Rice", "dhan": "Rice", "धान": "Rice", "चावल": "Rice", "ਝੋਨਾ": "Rice",
+    "tomato": "Tomato", "tamatar": "Tomato", "टमाटर": "Tomato", "ਟਮਾਟਰ": "Tomato",
+    "potato": "Potato", "aloo": "Potato", "aalu": "Potato", "आलू": "Potato", "ਆਲੂ": "Potato",
+    "onion": "Onion", "pyaj": "Onion", "pyaz": "Onion", "प्याज": "Onion", "ਗੰਢਾ": "Onion",
+    "mustard": "Mustard", "sarson": "Mustard", "सरसों": "Mustard", "ਸਰ੍ਹੋਂ": "Mustard",
+    "cotton": "Cotton", "kapas": "Cotton", "कपास": "Cotton", "ਕਪਾਹ": "Cotton",
+    "maize": "Maize", "corn": "Maize", "makka": "Maize", "मक्का": "Maize", "ਮੱਕੀ": "Maize",
+    "soybean": "Soybean", "सोयाबीन": "Soybean",
+    "sugarcane": "Sugarcane", "ganna": "Sugarcane", "गन्ना": "Sugarcane", "ਗੰਨਾ": "Sugarcane",
+}
+
+
+import re
+
+def extract_crop_from_query(text: str, default_crop: Optional[str] = None) -> str:
+    lower = text.lower()
+    for kw in sorted(CROP_MAP.keys(), key=lambda k: len(k), reverse=True):
+        pattern = r"\b" + re.escape(kw) + r"\b" if kw.isascii() else re.escape(kw)
+        if re.search(pattern, lower):
+            return CROP_MAP[kw]
+    return default_crop or "Wheat"
 
 
 def is_mandi_query(text: str) -> bool:
@@ -92,14 +116,16 @@ async def chat_with_assistant(req: ChatRequest):
     # Inject mandi trend intelligence ONLY when user query is about mandi/prices
     if is_mandi_query(user_query):
         try:
+            detected_crop = extract_crop_from_query(user_query, req.crop)
             mandi_intel = await mandi_trend_service.get_mandi_intelligence(
-                commodity=req.crop or "Wheat",
+                commodity=detected_crop,
                 location=req.location,
             )
             if mandi_intel and mandi_intel.get("modal_price", 0) > 0:
                 ctx["mandi_trends"] = (
-                    f"{mandi_intel.get('commodity')}: ₹{mandi_intel.get('modal_price')}/quintal "
-                    f"({mandi_intel.get('trend')}, range: {mandi_intel.get('price_range')})"
+                    f"Official AGMARKNET Data (data.gov.in): {mandi_intel.get('commodity')} at {mandi_intel.get('nearest_mandi')} ({mandi_intel.get('state')}). "
+                    f"Modal Price: ₹{mandi_intel.get('modal_price')}/quintal, Range: {mandi_intel.get('price_range')}, "
+                    f"Arrival Date: {mandi_intel.get('arrival_date')}."
                 )
                 ctx["mandi_data_freshness"] = mandi_intel.get("data_freshness", "live")
         except Exception as e:

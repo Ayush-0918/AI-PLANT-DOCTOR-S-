@@ -11,7 +11,7 @@ export default function FloatingExpertWidget() {
   const hotlineText = t('247_hotline') || '24/7 Expert Doctor Hotline';
 
   return (
-    <div className={`absolute pointer-events-none transition-all duration-300 ${isOpen ? 'z-[110]' : 'z-50'}`} style={{ bottom: '168px', right: '16px' }}>
+    <div className={`absolute pointer-events-none transition-all duration-300 ${isOpen ? 'z-[110]' : 'z-50'}`} style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 98px)', right: '16px' }}>
       <style>{`
         .child-pointer-events-auto > * { pointer-events: auto; }
         @keyframes wiggle {

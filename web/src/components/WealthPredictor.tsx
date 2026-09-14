@@ -118,7 +118,7 @@ export default function WealthPredictor() {
             </span>
             <div className="flex h-6 items-center gap-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/80 px-2.5 py-0.5 border border-emerald-300/80 dark:border-emerald-800/80 text-[10px] font-black text-emerald-700 dark:text-emerald-300 shadow-sm">
               <TrendingUp size={12} />
-              <span>ESTIMATED</span>
+              <span>{language === 'English' ? 'ESTIMATED' : 'अनुमानित'}</span>
             </div>
           </div>
         </div>

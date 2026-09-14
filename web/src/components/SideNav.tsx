@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Scan, ShoppingBag, Users, UserCircle2 } from 'lucide-react';
+import { Home, Scan, ShoppingBag, Users, UserCircle2, Cpu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AppLogo from '@/components/AppLogo';
 
@@ -11,6 +11,7 @@ export default function SideNav() {
 
   const navItems = [
     { label: 'HOME', icon: Home, route: '/dashboard' },
+    { label: 'HARDWARE', icon: Cpu, route: '/hardware' },
     { label: 'SCAN', icon: Scan, route: '/scanner' },
     { label: 'SHOP', icon: ShoppingBag, route: '/marketplace' },
     { label: 'COMMUNITY', icon: Users, route: '/community' },

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { fetchJson } from '@/lib/api';
 
 type CallStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -34,28 +33,32 @@ export function ExpertCallProvider({ children }: { children: ReactNode }) {
   const triggerCall = async () => {
     if (!phoneNumber) return;
     setStatus('loading');
+    setMessage('');
 
     try {
-      const data = await fetchJson<{ success: boolean; message?: string }>(`/api/expert/call`, {
+      const res = await fetch('/api/expert/call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phoneNumber })
+        body: JSON.stringify({ phone_number: phoneNumber }),
       });
-      if (!data.success) {
-        throw new Error(data.message || 'Call failed');
+
+      let data: { success: boolean; message?: string } = { success: false };
+      try { data = await res.json(); } catch {}
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || `Server error (${res.status})`);
       }
+
       setStatus('success');
       setMessage('📞 Aapke phone pe call aa rahi hai! Expert se baat karein.');
-      setTimeout(() => {
-        closeCallModal();
-      }, 5000);
+      setTimeout(() => { closeCallModal(); }, 5000);
     } catch (err: unknown) {
       setStatus('error');
       const msg = err instanceof Error ? err.message : '';
-      setMessage(msg || 'Call nahi hua. Thodi der baad try karein.');
-
+      setMessage(msg || 'Call nahi hua. Backend check karein ya VAPI credentials add karein.');
     }
   };
+
 
   return (
     <ExpertCallContext.Provider value={{

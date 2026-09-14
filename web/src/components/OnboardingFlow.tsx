@@ -23,6 +23,7 @@ import AppLogo from '@/components/AppLogo';
 import { useLanguage } from '@/context/LanguageContext';
 import { useFarmerProfile } from '@/context/FarmerProfileContext';
 import { APP_LANGUAGES, getLanguageMeta, getSpeechLangCode } from '@/lib/languages';
+import { reverseGeocodeCoords, fetchIpLocation } from '@/lib/locationDetector';
 
 /* ── Per-language onboarding copy ──────────────────────────── */
 const OB: Record<string, {
@@ -218,9 +219,9 @@ export default function OnboardingFlow() {
   const farmerTypes = useMemo(() => [S.ft1, S.ft2, S.ft3], [S]);
 
   const cropOptions = [
-    'Wheat', 'Rice', 'Tomato', 'Potato', 'Cotton', 'Sugarcane',
-    'Mustard', 'Maize', 'Brinjal', 'Onion', 'Chilli', 'Banana',
-    'Soybean', 'Groundnut', 'Gram', 'Jowar',
+    'गेहूँ', 'धान', 'टमाटर', 'आलू', 'कपास', 'गन्ना',
+    'सरसों', 'मक्का', 'बैंगन', 'प्याज', 'मिर्च', 'केला',
+    'सोयाबीन', 'मूंगफली', 'चना', 'ज्वार',
   ];
 
   const [draft, setDraft] = useState({
@@ -232,6 +233,9 @@ export default function OnboardingFlow() {
     crops: profile.crops,
     voiceEnabled: profile.voiceEnabled,
     locationAllowed: profile.locationAllowed,
+    locationLabel: profile.locationLabel,
+    locationSource: profile.locationSource,
+    isApproximateLocation: profile.isApproximateLocation,
     latitude: profile.latitude,
     longitude: profile.longitude,
   });
@@ -264,6 +268,9 @@ export default function OnboardingFlow() {
       crops: draft.crops,
       voiceEnabled: draft.voiceEnabled,
       locationAllowed: draft.locationAllowed,
+      locationLabel: draft.locationLabel,
+      locationSource: draft.locationSource,
+      isApproximateLocation: draft.isApproximateLocation,
       latitude: draft.latitude,
       longitude: draft.longitude,
     });
@@ -354,32 +361,93 @@ export default function OnboardingFlow() {
   }, [step, language]); // Re-run if language changes while on screen
 
   const requestLocation = async () => {
+    setIsLocating(true);
+
     if (!navigator.geolocation) {
-      setDraft((current) => ({ ...current, locationAllowed: false }));
+      try {
+        const ipLoc = await fetchIpLocation();
+        if (ipLoc && ipLoc.success) {
+          setDraft((current) => ({
+            ...current,
+            locationAllowed: false,
+            latitude: ipLoc.latitude,
+            longitude: ipLoc.longitude,
+            village: current.village || ipLoc.village || '',
+            state: current.state || ipLoc.state || '',
+            locationLabel: ipLoc.locationLabel,
+            locationSource: 'ip',
+            isApproximateLocation: true,
+          }));
+        }
+      } catch (err) {
+        console.warn('IP fallback failed on non-geolocation device:', err);
+      }
+      setIsLocating(false);
       nextStep();
       return;
     }
 
-    setIsLocating(true);
-
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setDraft((current) => ({
-          ...current,
-          locationAllowed: true,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        }));
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const geocoded = await reverseGeocodeCoords(latitude, longitude);
+          setDraft((current) => ({
+            ...current,
+            locationAllowed: true,
+            latitude,
+            longitude,
+            village: current.village || geocoded.village || '',
+            state: current.state || geocoded.state || '',
+            locationLabel: geocoded.locationLabel,
+            locationSource: 'gps',
+            isApproximateLocation: false,
+          }));
+        } catch (err) {
+          console.warn('Reverse geocoding during onboarding failed:', err);
+          setDraft((current) => ({
+            ...current,
+            locationAllowed: true,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            locationSource: 'gps',
+            isApproximateLocation: false,
+          }));
+        }
         setIsLocating(false);
         nextStep();
       },
-      () => {
-        setDraft((current) => ({
-          ...current,
-          locationAllowed: false,
-          latitude: null,
-          longitude: null,
-        }));
+      async () => {
+        try {
+          const ipLoc = await fetchIpLocation();
+          if (ipLoc && ipLoc.success) {
+            setDraft((current) => ({
+              ...current,
+              locationAllowed: false,
+              latitude: ipLoc.latitude,
+              longitude: ipLoc.longitude,
+              village: current.village || ipLoc.village || '',
+              state: current.state || ipLoc.state || '',
+              locationLabel: ipLoc.locationLabel,
+              locationSource: 'ip',
+              isApproximateLocation: true,
+            }));
+          } else {
+            setDraft((current) => ({
+              ...current,
+              locationAllowed: false,
+              latitude: null,
+              longitude: null,
+            }));
+          }
+        } catch {
+          setDraft((current) => ({
+            ...current,
+            locationAllowed: false,
+            latitude: null,
+            longitude: null,
+          }));
+        }
         setIsLocating(false);
         nextStep();
       },
@@ -391,13 +459,13 @@ export default function OnboardingFlow() {
   };
 
   const enterApp = () => {
-    const finalCrops = draft.crops.length ? draft.crops : ['Wheat', 'Rice'];
+    const finalCrops = draft.crops.length ? draft.crops : ['गेहूँ', 'धान'];
     completeOnboarding({
-      name: draft.name.trim() || 'Kishan Kumar',
-      village: draft.village.trim() || 'Nalanda',
-      state: draft.state.trim() || 'Bihar',
+      name: draft.name.trim() || 'किशन कुमार',
+      village: draft.village.trim() || 'नालंदा',
+      state: draft.state.trim() || 'बिहार',
       farmerType: draft.farmerType,
-      farmSize: draft.farmSize.trim() || '3.5 acres',
+      farmSize: draft.farmSize.trim() || '3.5 एकड़',
       crops: finalCrops,
       activeCrop: finalCrops[0],
       voiceEnabled: draft.voiceEnabled,
@@ -586,7 +654,7 @@ export default function OnboardingFlow() {
                       <input
                         value={draft.village}
                         onChange={(e) => setDraft((c) => ({ ...c, village: e.target.value }))}
-                        placeholder="Nalanda"
+                        placeholder="e.g. Ludhiana / Karnal"
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 focus:border-blue-600 focus:outline-none"
                       />
                     </div>
@@ -595,7 +663,7 @@ export default function OnboardingFlow() {
                       <input
                         value={draft.state}
                         onChange={(e) => setDraft((c) => ({ ...c, state: e.target.value }))}
-                        placeholder="Bihar"
+                        placeholder="e.g. Punjab / Haryana"
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 focus:border-blue-600 focus:outline-none"
                       />
                     </div>
@@ -811,7 +879,13 @@ export default function OnboardingFlow() {
                   <div className="w-full mt-10 rounded-3xl border border-slate-200 bg-slate-50 p-6 space-y-4">
                     <SummaryRow label={S.langLabel} value={currentLanguage.label} />
                     <SummaryRow label={S.farmerLabel} value={`${draft.name || 'Kishan'} (${draft.farmerType})`} />
-                    <SummaryRow label={S.locationLabel} value={`${draft.village || 'City'}, ${draft.state || 'State'}`} />
+                    <SummaryRow
+                      label={S.locationLabel}
+                      value={
+                        draft.locationLabel ||
+                        (draft.village ? `${draft.village}, ${draft.state || ''}` : (language === 'English' ? 'Detected on first scan' : 'स्वतः पहचानी जाएगी'))
+                      }
+                    />
                     <div className="flex wrap gap-2 pt-2 border-t border-slate-200">
                       {draft.crops.map(c => (
                         <span key={c} className="text-xs font-bold bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-md">{c}</span>

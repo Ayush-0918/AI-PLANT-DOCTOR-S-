@@ -366,7 +366,7 @@ export default function SoilGuidePage() {
   const progressIdx   = progressSteps.indexOf(step);
 
   return (
-    <div className="min-h-screen pb-52 sm:pb-56 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative overflow-hidden">
+    <div className="min-h-screen pb-6 sm:pb-8 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative overflow-hidden">
 
       {/* Soft Ambient Background Orbs */}
       <div className="absolute top-10 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />

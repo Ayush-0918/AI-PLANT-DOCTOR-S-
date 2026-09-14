@@ -119,9 +119,17 @@ if len(set(chat_endpoint_paths)) < len(chat_endpoint_paths):
     raise RuntimeError(f"🚨 ROUTE COLLISION DETECTED! Multiple routes registered for same chat path: {chat_endpoint_paths}")
 
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -150,7 +158,8 @@ LEGACY_API_PREFIXES = (
 async def block_legacy_api_routes(request: Request, call_next):
     path = request.url.path
     if not settings.enable_legacy_api and any(path.startswith(prefix) for prefix in LEGACY_API_PREFIXES):
-        return JSONResponse(
+        origin = request.headers.get("origin", "*")
+        response = JSONResponse(
             status_code=410,
             content={
                 "success": False,
@@ -159,6 +168,9 @@ async def block_legacy_api_routes(request: Request, call_next):
                 "path": path,
             },
         )
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
     return await call_next(request)
 
 # ==========================================================
@@ -218,13 +230,13 @@ async def seed_database():
         if await db.products.count_documents({}) == 0:
             print("🌱 Seeding Products...")
             await db.products.insert_many([
-                {"title": "Bayer Fungicide Plus", "description": "Broad-spectrum disease control", "price": "₹450", "category": "Medicines", "rating": 4.8, "reviews": 128, "seller": "AgriGrow Supply", "sellerBadge": "Verified", "image": "https://images.unsplash.com/photo-1581091226033-d5c48150dbaa?q=80&w=400", "stock": 42},
-                {"title": "Syngenta Isabion", "description": "Amino acid organic biostimulant", "price": "₹1200", "category": "Medicines", "rating": 4.9, "reviews": 312, "seller": "FarmCare Direct", "sellerBadge": "Premium", "image": "https://images.unsplash.com/photo-1628352081506-83c43123ed6d?q=80&w=400", "stock": 15},
-                {"title": "Neem Oil Extract 100%", "description": "Natural pest deterrent for early stages", "price": "₹250", "category": "Medicines", "rating": 4.5, "reviews": 89, "seller": "Green Earth", "sellerBadge": "Eco", "image": "https://images.unsplash.com/photo-1615485906371-d64e9a3b6d08?q=80&w=400", "stock": 100},
-                {"title": "Mahindra Tractor 275 DI", "description": "39 HP robust farming tractor", "price": "₹5,50,000", "category": "Machines", "rating": 4.5, "reviews": 46, "seller": "Mahindra Auth. Dealer", "sellerBadge": "Official", "image": "https://images.unsplash.com/photo-1533227268408-a774693194a8?q=80&w=400", "stock": 5},
-                {"title": "John Deere 5050E", "description": "50 HP heavy duty tractor with EMI option", "price": "₹8,20,000", "category": "Machines", "rating": 4.7, "reviews": 23, "seller": "JD Agromotors", "sellerBadge": "Verified", "image": "https://images.unsplash.com/photo-1594489428504-5c0c480a15fd?q=80&w=400", "stock": 2},
-                {"title": "Premium Combine Harvester", "description": "High yield crop harvesting machine", "price": "₹1500/hr", "category": "Rental", "rating": 4.6, "reviews": 75, "seller": "Kisan Rentals", "sellerBadge": "Trusted", "image": "https://images.unsplash.com/photo-1517404212739-650058e578f2?q=80&w=400", "stock": 10},
-                {"title": "Laser Land Leveler", "description": "Precision land leveling for better watering", "price": "₹800/hr", "category": "Rental", "rating": 4.8, "reviews": 112, "seller": "AgriTech Services", "sellerBadge": "Top Rated", "image": "https://images.unsplash.com/photo-1444858291040-58f756a3bcd6?q=80&w=400", "stock": 8},
+                {"title": "बेयर फंगीसाइड प्लस", "description": "व्यापक रोग नियंत्रण", "price": "₹450", "category": "दवाइयाँ", "rating": 4.8, "reviews": 128, "seller": "एग्रीग्रो सप्लाई", "sellerBadge": "प्रमाणित", "image": "https://images.unsplash.com/photo-1581091226033-d5c48150dbaa?q=80&w=400", "stock": 42},
+                {"title": "सिंजेंटा ईसाबियन", "description": "अमीनो एसिड जैविक बायोस्टिमुलेंट", "price": "₹1200", "category": "दवाइयाँ", "rating": 4.9, "reviews": 312, "seller": "फार्मकेयर डायरेक्ट", "sellerBadge": "प्रीमियम", "image": "https://images.unsplash.com/photo-1628352081506-83c43123ed6d?q=80&w=400", "stock": 15},
+                {"title": "नीम तेल अर्क 100%", "description": "शुरुआती कीटों के लिए प्राकृतिक निवारक", "price": "₹250", "category": "दवाइयाँ", "rating": 4.5, "reviews": 89, "seller": "ग्रीन अर्थ", "sellerBadge": "इको", "image": "https://images.unsplash.com/photo-1615485906371-d64e9a3b6d08?q=80&w=400", "stock": 100},
+                {"title": "महिंद्रा ट्रैक्टर 275 DI", "description": "39 HP मजबूत खेती का ट्रैक्टर", "price": "₹5,50,000", "category": "मशीनें", "rating": 4.5, "reviews": 46, "seller": "महिंद्रा अधिकृत डीलर", "sellerBadge": "आधिकारिक", "image": "https://images.unsplash.com/photo-1533227268408-a774693194a8?q=80&w=400", "stock": 5},
+                {"title": "जॉन डियर 5050E", "description": "EMI विकल्प के साथ 50 HP भारी ट्रैक्टर", "price": "₹8,20,000", "category": "मशीनें", "rating": 4.7, "reviews": 23, "seller": "जेडी एग्रोमोटर्स", "sellerBadge": "प्रमाणित", "image": "https://images.unsplash.com/photo-1594489428504-5c0c480a15fd?q=80&w=400", "stock": 2},
+                {"title": "प्रीमियम कंबाइन हार्वेस्टर", "description": "उच्च उपज फसल कटाई मशीन", "price": "₹1500/hr", "category": "किराया", "rating": 4.6, "reviews": 75, "seller": "किसान रेंटल", "sellerBadge": "विश्वसनीय", "image": "https://images.unsplash.com/photo-1517404212739-650058e578f2?q=80&w=400", "stock": 10},
+                {"title": "लेजर लैंड लेवलर", "description": "बेहतर सिंचाई के लिए सटीक भूमि समतलन", "price": "₹800/hr", "category": "किराया", "rating": 4.8, "reviews": 112, "seller": "एग्रीटेक सर्विसेज", "sellerBadge": "शीर्ष रेटेड", "image": "https://images.unsplash.com/photo-1444858291040-58f756a3bcd6?q=80&w=400", "stock": 8},
             ])
         await db.scans.create_index([("location", "2dsphere")])
     except Exception as e:

@@ -2,7 +2,7 @@ import asyncio
 import unittest
 
 from app.core.errors import ValidationError
-from app.services.expert_call_service import (
+from app.services.expert import (
     parse_call_status_payload,
     update_call_status_from_webhook,
 )

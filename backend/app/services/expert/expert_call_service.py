@@ -11,8 +11,10 @@ from app.core.security import normalize_phone_number
 
 
 def _ensure_call_config() -> None:
-    if not settings.vapi_api_key or not settings.vapi_assistant_id or not settings.vapi_phone_number_id:
-        raise DependencyError("Expert call provider not configured.")
+    has_vapi = bool(settings.vapi_api_key and settings.vapi_assistant_id and settings.vapi_phone_number_id)
+    has_twilio = bool(settings.twilio_account_sid and settings.twilio_auth_token and settings.twilio_phone_number)
+    if not has_vapi and not has_twilio:
+        raise DependencyError("Expert call provider not configured. Please add Vapi or Twilio credentials.")
 
 
 async def _save_call_log(db, payload: Dict[str, Any]) -> str:
@@ -43,46 +45,93 @@ async def trigger_expert_call(
     except ValueError as exc:
         raise ValidationError(str(exc))
 
-    payload = {
-        "assistantId": settings.vapi_assistant_id,
-        "phoneNumberId": settings.vapi_phone_number_id,
-        "customer": {"number": normalized_phone},
-    }
-    headers = {
-        "Authorization": "Bearer {}".format(settings.vapi_api_key),
-        "Content-Type": "application/json",
-    }
+    has_vapi = bool(settings.vapi_api_key and settings.vapi_assistant_id and settings.vapi_phone_number_id)
+    has_twilio = bool(settings.twilio_account_sid and settings.twilio_auth_token and settings.twilio_phone_number)
 
     last_error = "Unknown failure"
     for attempt in range(1, max_attempts + 1):
         try:
             async with httpx.AsyncClient(timeout=12.0) as client:
-                response = await client.post(settings.vapi_url, json=payload, headers=headers)
-                body = response.json() if response.text else {}
-                if response.status_code in {200, 201}:
-                    call_id = str(body.get("id", ""))
-                    call_log_id = await _save_call_log(
-                        db,
-                        {
-                            "user_id": user_id or "anonymous",
-                            "phone_number": normalized_phone,
-                            "reason": reason,
-                            "metadata": metadata or {},
-                            "attempts": attempt,
-                            "provider": "vapi",
-                            "provider_response": body,
-                            "status": "initiated",
+                if has_vapi:
+                    payload = {
+                        "assistantId": settings.vapi_assistant_id,
+                        "phoneNumberId": settings.vapi_phone_number_id,
+                        "customer": {"number": normalized_phone},
+                    }
+                    headers = {
+                        "Authorization": "Bearer {}".format(settings.vapi_api_key),
+                        "Content-Type": "application/json",
+                    }
+                    response = await client.post(settings.vapi_url, json=payload, headers=headers)
+                    body = response.json() if response.text else {}
+                    if response.status_code in {200, 201}:
+                        call_id = str(body.get("id", ""))
+                        call_log_id = await _save_call_log(
+                            db,
+                            {
+                                "user_id": user_id or "anonymous",
+                                "phone_number": normalized_phone,
+                                "reason": reason,
+                                "metadata": metadata or {},
+                                "attempts": attempt,
+                                "provider": "vapi",
+                                "provider_response": body,
+                                "status": "initiated",
+                                "call_id": call_id,
+                            },
+                        )
+                        return {
+                            "success": True,
                             "call_id": call_id,
-                        },
+                            "status": "initiated",
+                            "attempts": attempt,
+                            "message": "AI Plant Doctor (VAPI) call initiated.",
+                        }, call_log_id
+                    last_error = body.get("message") or "VAPI returned {}".format(response.status_code)
+                elif has_twilio:
+                    # Direct Twilio REST Call Fallback
+                    twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Calls.json"
+                    twiml_script = (
+                        "<Response><Say voice='alice' language='hi-IN'>"
+                        "Namaste ji! Main aapka AI Plant Doctor hoon. Aap tension na lein, "
+                        "aapki kheti aur paudhon ki har samasya me main aapki sahayata karunga."
+                        "</Say></Response>"
                     )
-                    return {
-                        "success": True,
-                        "call_id": call_id,
-                        "status": "initiated",
-                        "attempts": attempt,
-                        "message": "Expert call initiated.",
-                    }, call_log_id
-                last_error = body.get("message") or "Provider returned {}".format(response.status_code)
+                    data = {
+                        "To": normalized_phone,
+                        "From": settings.twilio_phone_number,
+                        "Twiml": twiml_script,
+                    }
+                    response = await client.post(
+                        twilio_url,
+                        data=data,
+                        auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+                    )
+                    body = response.json() if response.text else {}
+                    if response.status_code in {200, 201}:
+                        call_id = str(body.get("sid", ""))
+                        call_log_id = await _save_call_log(
+                            db,
+                            {
+                                "user_id": user_id or "anonymous",
+                                "phone_number": normalized_phone,
+                                "reason": reason,
+                                "metadata": metadata or {},
+                                "attempts": attempt,
+                                "provider": "twilio",
+                                "provider_response": body,
+                                "status": "initiated",
+                                "call_id": call_id,
+                            },
+                        )
+                        return {
+                            "success": True,
+                            "call_id": call_id,
+                            "status": "initiated",
+                            "attempts": attempt,
+                            "message": "AI Plant Doctor (Twilio Voice) call initiated.",
+                        }, call_log_id
+                    last_error = body.get("message") or "Twilio returned {}".format(response.status_code)
         except Exception as exc:
             last_error = str(exc)
 

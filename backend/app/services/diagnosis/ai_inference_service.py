@@ -10,6 +10,12 @@ from app.services.diagnosis.knowledge_base_service import (
     get_growth_care_recommendations,
     get_localized_treatment_summary,
     get_localized_medicine,
+    get_localized_crop,
+    get_localized_diagnosis,
+    get_localized_dosage,
+    get_localized_stage,
+    get_localized_severity,
+    get_localized_text,
     normalize_language,
     get_treatment_record,
 )
@@ -152,37 +158,49 @@ async def run_scan_inference(
             else "Disease detected. Follow treatment and re-scan in 48 hours."
         )
     )
-    recommendation_action = localized_summary or default_recommendation_action
+    recommendation_action = localized_summary or get_localized_text(default_recommendation_action, language)
     summary_en = get_localized_treatment_summary(treatment_record, "English")
     summary_hi = get_localized_treatment_summary(treatment_record, "हिंदी")
     normalized_language = normalize_language(language)
     if summary_en and summary_hi and summary_en.strip() != summary_hi.strip():
         if normalized_language == "English":
             recommendation_action = summary_en
-        elif normalized_language == "हिंदी":
+        elif normalized_language in ["हिंदी", "भोजपुरी"]:
             recommendation_action = summary_hi
-    elif not recommendation_action and summary_en:
-        recommendation_action = summary_en
+    elif not recommendation_action:
+        recommendation_action = get_localized_text(default_recommendation_action, language)
 
     merged_treatment: Dict[str, Any] = dict(treatment)
+    raw_med = treatment_record.get("medicine_name", merged_treatment.get("medicine")) if treatment_record else merged_treatment.get("medicine")
+    raw_dosage = treatment_record.get("dosage_per_liter", merged_treatment.get("dosage")) if treatment_record else merged_treatment.get("dosage")
+    raw_instructions = treatment_record.get("cultural_control", merged_treatment.get("instructions")) if treatment_record else merged_treatment.get("instructions")
+
+    localized_med = get_localized_medicine(str(raw_med or ""), language)
+    localized_dosage = get_localized_dosage(str(raw_dosage or ""), language)
+    localized_instructions = get_localized_text(str(raw_instructions or ""), language)
+
+    merged_treatment.update(
+        {
+            "medicine": localized_med,
+            "raw_medicine": raw_med,
+            "dosage": localized_dosage,
+            "instructions": localized_instructions,
+            "localized_disease": get_localized_diagnosis(diagnosis, language),
+            "localized_crop": get_localized_crop(crop_name, language),
+        }
+    )
     if treatment_record:
-        raw_med = treatment_record.get("medicine_name", merged_treatment.get("medicine"))
-        localized_med = get_localized_medicine(raw_med, language)
         merged_treatment.update(
             {
-                "medicine": localized_med,
-                "raw_medicine": raw_med,
-                "dosage": treatment_record.get("dosage_per_liter", merged_treatment.get("dosage")),
-                "instructions": treatment_record.get("cultural_control", merged_treatment.get("instructions")),
                 "active_ingredient": treatment_record.get("active_ingredient"),
-                "dosage_per_acre": treatment_record.get("dosage_per_acre"),
+                "dosage_per_acre": get_localized_dosage(str(treatment_record.get("dosage_per_acre") or ""), language),
                 "spray_interval_days": treatment_record.get("spray_interval_days"),
                 "waiting_period_days": treatment_record.get("waiting_period_days"),
                 "recovery_window_days": treatment_record.get("recovery_window_days"),
-                "irrigation_advice": treatment_record.get("irrigation_advice"),
-                "chemical_control": treatment_record.get("chemical_control"),
-                "precautionary_notes": treatment_record.get("precautionary_notes"),
-                "escalation_rule": treatment_record.get("escalation_rule"),
+                "irrigation_advice": get_localized_text(str(treatment_record.get("irrigation_advice") or ""), language),
+                "chemical_control": get_localized_text(str(treatment_record.get("chemical_control") or ""), language),
+                "precautionary_notes": get_localized_text(str(treatment_record.get("precautionary_notes") or ""), language),
+                "escalation_rule": get_localized_text(str(treatment_record.get("escalation_rule") or ""), language),
             }
         )
 

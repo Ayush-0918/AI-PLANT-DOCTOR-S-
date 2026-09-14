@@ -102,7 +102,7 @@ export default function MandiIntelligencePage() {
 
   return (
     <div 
-      className="min-h-screen text-white pb-32"
+      className="min-h-screen text-white pb-6 sm:pb-8"
       style={{
         background: 'radial-gradient(circle at 100% 0%, rgba(20,83,45,0.2) 0%, transparent 40%), linear-gradient(180deg, #070f1c 0%, #0a1426 46%, #081224 100%)',
       }}

@@ -608,7 +608,7 @@ export default function SahayakPage() {
       {/* ── CHAT MESSAGES AREA ── */}
       <div
         ref={chatContainerRef}
-        className="flex-1 min-h-0 px-4 pt-4 pb-3 space-y-4 overflow-y-auto hide-scrollbar"
+        className="flex-1 min-h-0 px-4 pt-4 pb-3 space-y-4 overflow-y-auto overscroll-contain hide-scrollbar"
       >
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
@@ -646,7 +646,12 @@ export default function SahayakPage() {
 
                 {msg.image && (
                   <div className="mb-3 rounded-2xl overflow-hidden border border-white/20">
-                    <img src={msg.image} alt="Attached plant leaf sample" className="max-h-48 w-full object-cover" />
+                    <img
+                      src={msg.image}
+                      alt="Attached plant leaf sample"
+                      className="max-h-48 w-full object-cover"
+                      onLoad={scrollToBottom}
+                    />
                   </div>
                 )}
 
@@ -757,7 +762,7 @@ export default function SahayakPage() {
       )}
 
       {/* ── BOTTOM VOICE & INPUT CONTROL ── */}
-      <div className="shrink-0 px-4 pt-2 pb-7 border-t border-slate-200/60 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-lg z-20">
+      <div className="shrink-0 px-4 pt-2 pb-3 sm:pb-4 border-t border-slate-200/60 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-lg z-30">
         <div className="chat-input-bar rounded-[2rem] p-1.5 flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80">
           {/* Main Voice Assistant Button */}
           <motion.button

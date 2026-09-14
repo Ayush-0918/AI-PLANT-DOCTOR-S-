@@ -18,7 +18,7 @@ export default function AppShell({
 }) {
   const pathname = usePathname();
   const { profile, isHydrated } = useFarmerProfile();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isMarketing = pathname === '/';
   const showChrome = isHydrated && profile.onboardingCompleted;
   const isAssistant = pathname === '/assistant';
@@ -73,16 +73,33 @@ export default function AppShell({
           {showHeader && <ModernHeader />}
 
         {/* ── MAIN CONTENT ── */}
-        <main className={`relative z-10 flex-1 min-h-0 flex flex-col ${isAssistant ? 'overflow-hidden' : 'overflow-y-auto hide-scrollbar'} ${showChrome && !hideNav && !isAssistant ? 'pb-[110px]' : ''}`}>
+        <main
+          className={`relative z-10 flex-1 min-h-0 flex flex-col ${
+            isAssistant
+              ? 'overflow-hidden h-full'
+              : 'overflow-y-auto hide-scrollbar overscroll-contain'
+          }`}
+          style={isAssistant ? undefined : { WebkitOverflowScrolling: 'touch' }}
+        >
           {children}
 
-          {showChrome && !hideNav && (
-            <div className="mt-6 flex justify-center items-center gap-2 py-10 opacity-70">
-              <Leaf size={12} className="text-emerald-500/80" />
-              <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-slate-400">
-                {t('pd_suite')}
+          {showChrome && !hideNav && !isAssistant && (
+            <div className="mt-8 flex flex-col justify-center items-center gap-1.5 py-4 opacity-70">
+              <div className="flex items-center gap-2">
+                <Leaf size={14} className="text-emerald-500/80" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-slate-400">
+                  {t('pd_suite')}
+                </p>
+              </div>
+              <p className="text-[9px] text-slate-400/60 font-medium">
+                {language === 'English' ? 'Smart Farming Assistant • Plant Doctor AI' : 'स्मार्ट कृषि सहायक • प्लांट डॉक्टर AI'}
               </p>
             </div>
+          )}
+
+          {/* Dedicated bottom clearance spacer to guarantee 100% scrolling clearance above BottomNav and floating widgets */}
+          {showChrome && !hideNav && !isAssistant && (
+            <div className="h-44 sm:h-48 w-full shrink-0 pointer-events-none" aria-hidden="true" />
           )}
         </main>
 

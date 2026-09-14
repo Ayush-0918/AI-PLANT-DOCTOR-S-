@@ -111,7 +111,7 @@ export default function SellProductPage() {
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5 block flex items-center gap-1.5"><Package size={12}/> Category</label>
                 <select value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))} className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-sm font-semibold outline-none appearance-none">
                   <option value="Seeds">Seeds</option>
-                  <option value="Medicines">Medicines & Fert</option>
+                  <option value="Pesticides">Pesticides & Fertilizers</option>
                   <option value="Machines">Machines</option>
                   <option value="Rental">Rental</option>
                 </select>
