@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Sprout, Loader2, RefreshCw, ChevronRight,
@@ -13,26 +13,35 @@ import { useFarmerProfile } from '@/context/FarmerProfileContext';
 import { useLanguage } from '@/context/LanguageContext';
 
 const CROPS = ['Wheat', 'Rice', 'Tomato', 'Potato', 'Corn', 'Cotton', 'Soybean', 'Sugarcane'];
+
 const CROP_ICONS: Record<string, string> = {
   Wheat: '🌾', Rice: '🌿', Tomato: '🍅', Potato: '🥔',
   Corn: '🌽', Cotton: '☁️', Soybean: '🫘', Sugarcane: '🎋',
 };
 
-const CROP_TRANSLATIONS: Record<string, Record<string, string>> = {
-  'हिंदी': { Wheat: 'गेहूं', Rice: 'धान', Tomato: 'टमाटर', Potato: 'आलू', Corn: 'मक्का', Cotton: 'कपास', Soybean: 'सोयाबीन', Sugarcane: 'गन्ना' },
-  'भोजपुरी': { Wheat: 'गेहूं', Rice: 'धान', Tomato: 'टमाटर', Potato: 'आलू', Corn: 'मक्का', Cotton: 'कपास', Soybean: 'सोयाबीन', Sugarcane: 'गन्ना' },
-  'मैथिली': { Wheat: 'गहूम', Rice: 'धान', Tomato: 'टमाटर', Potato: 'आलू', Corn: 'मकई', Cotton: 'कपास', Soybean: 'सोयाबीन', Sugarcane: 'गन्ना' },
-  'ਪੰਜਾਬੀ': { Wheat: 'ਕਣਕ', Rice: 'ਧਾਨ', Tomato: 'ਟਮਾਟਰ', Potato: 'ਆਲੂ', Corn: 'ਮੱਕੀ', Cotton: 'ਕਪਾਹ', Soybean: 'ਸੋਇਆਬੀਨ', Sugarcane: 'ਗੰਨਾ' },
-  'मराठी': { Wheat: 'गहू', Rice: 'भात', Tomato: 'टोमॅटो', Potato: 'बटाटा', Corn: 'मका', Cotton: 'कापूस', Soybean: 'सोयाबीन', Sugarcane: 'ऊस' },
-  'ગુજરાતી': { Wheat: 'ઘઉં', Rice: 'ધાન', Tomato: 'ટામેટા', Potato: 'બટાકા', Corn: 'મકાઈ', Cotton: 'કપાસ', Soybean: 'સોયાબીન', Sugarcane: 'શેરડી' },
-  'తెలుగు': { Wheat: 'గోధుమ', Rice: 'వరి', Tomato: 'టమాట', Potato: 'బంగాళాదుంప', Corn: 'మొక్కజొన్న', Cotton: 'పత్తి', Soybean: 'సోయాబీన్', Sugarcane: 'చెరకు' },
+const ENGLISH_CROPS: Record<string, string> = {
+  'गेहूं': 'Wheat', 'गेहूँ': 'Wheat', 'धान': 'Rice', 'टमाटर': 'Tomato', 'आलू': 'Potato',
+  'मक्का': 'Corn', 'मकई': 'Corn', 'कपास': 'Cotton', 'सोयाबीन': 'Soybean', 'गन्ना': 'Sugarcane'
 };
 
+const HINDI_CROPS: Record<string, string> = {
+  'Wheat': 'गेहूँ', 'Rice': 'धान', 'Tomato': 'टमाटर', 'Potato': 'आलू',
+  'Corn': 'मक्का', 'Cotton': 'कपास', 'Soybean': 'सोयाबीन', 'Sugarcane': 'गन्ना'
+};
+
+function getDisplayCropName(cropStr: string, isHindi: boolean): string {
+  const englishName = ENGLISH_CROPS[cropStr] || cropStr;
+  if (!isHindi) {
+    return englishName;
+  }
+  return HINDI_CROPS[englishName] || cropStr;
+}
+
 const STAGES = [
-  { id: 'germination', label: 'Germination', labelHi: 'अंकुरण (0-21 दिन)', icon: '🌱' },
-  { id: 'vegetative', label: 'Vegetative', labelHi: 'वानस्पतिक वृद्धि (21-60 दिन)', icon: '🌿' },
-  { id: 'flowering', label: 'Flowering', labelHi: 'फूल व दाना भराव (60-90 दिन)', icon: '🌸' },
-  { id: 'maturity', label: 'Maturity', labelHi: 'परिपक्वता व कटाई (90+ दिन)', icon: '🌾' },
+  { id: 'germination', labelEn: 'Germination (0-21 Days)', labelHi: 'अंकुरण (0-21 दिन)', icon: '🌱' },
+  { id: 'vegetative', labelEn: 'Vegetative (21-60 Days)', labelHi: 'वानस्पतिक वृद्धि (21-60 दिन)', icon: '🌿' },
+  { id: 'flowering', labelEn: 'Flowering & Grain Fill (60-90 Days)', labelHi: 'फूल व दाना भराव (60-90 दिन)', icon: '🌸' },
+  { id: 'maturity', labelEn: 'Maturity & Harvest (90+ Days)', labelHi: 'परिपक्वता व कटाई (90+ दिन)', icon: '🌾' },
 ];
 
 export default function GrowthCareGuidePage() {
@@ -40,12 +49,13 @@ export default function GrowthCareGuidePage() {
   const { language } = useLanguage();
   const isHindi = language !== 'English';
 
-  const [crop, setCrop] = useState<string>(profile.activeCrop || 'Wheat');
+  const [rawCrop, setRawCrop] = useState<string>(profile.activeCrop || 'Wheat');
   const [stage, setStage] = useState<string>('vegetative');
 
-  const localCropName = (value: string) => CROP_TRANSLATIONS[language]?.[value] || value;
+  // Normalize crop name string
+  const activeCropEn = useMemo(() => ENGLISH_CROPS[rawCrop] || rawCrop, [rawCrop]);
+  const activeCropDisplay = useMemo(() => getDisplayCropName(rawCrop, isHindi), [rawCrop, isHindi]);
 
-  // Visual Timeline Data
   const currentStageObj = useMemo(() => STAGES.find(s => s.id === stage) || STAGES[1], [stage]);
 
   return (
@@ -91,10 +101,10 @@ export default function GrowthCareGuidePage() {
           <div className="flex items-center justify-between gap-4 relative z-10">
             <div>
               <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-white/20 backdrop-blur-md text-purple-100 border border-white/20">
-                {isHindi ? 'फसल स्वास्थ्य गाइड' : 'Smart Field Advisory'}
+                {isHindi ? 'फसल स्वास्थ्य निर्देश' : 'Smart Field Advisory'}
               </span>
               <h2 className="text-lg font-black mt-2 leading-snug">
-                {isHindi ? `${localCropName(crop)} विकास और देखभाल चक्र` : `${crop} Growth Cycle & Care`}
+                {isHindi ? `${activeCropDisplay} विकास और देखभाल चक्र` : `${activeCropDisplay} Growth Cycle & Care`}
               </h2>
               <p className="text-xs text-purple-100 font-medium mt-1 opacity-90 leading-relaxed">
                 {isHindi
@@ -103,7 +113,7 @@ export default function GrowthCareGuidePage() {
               </p>
             </div>
             <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur-md border border-white/30 flex items-center justify-center shrink-0 text-3xl shadow-inner">
-              {CROP_ICONS[crop] || '🌱'}
+              {CROP_ICONS[activeCropEn] || '🌱'}
             </div>
           </div>
         </div>
@@ -114,20 +124,21 @@ export default function GrowthCareGuidePage() {
             {isHindi ? 'अपनी फसल चुनें' : 'Select Crop'}
           </p>
           <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-            {CROPS.map(c => {
-              const isSelected = crop === c;
+            {CROPS.map(cEn => {
+              const isSelected = activeCropEn === cEn;
+              const displayName = getDisplayCropName(cEn, isHindi);
               return (
                 <button
-                  key={c}
-                  onClick={() => setCrop(c)}
+                  key={cEn}
+                  onClick={() => setRawCrop(cEn)}
                   className={`shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-black transition-all border ${
                     isSelected
                       ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-500 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20 shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
                   }`}
                 >
-                  <span className="text-base">{CROP_ICONS[c] || '🌱'}</span>
-                  <span>{isHindi ? localCropName(c) : c}</span>
+                  <span className="text-base">{CROP_ICONS[cEn] || '🌱'}</span>
+                  <span>{displayName}</span>
                 </button>
               );
             })}
@@ -142,7 +153,7 @@ export default function GrowthCareGuidePage() {
               <span>{isHindi ? 'फसल विकास अवस्था चुनें' : 'Select Growth Stage'}</span>
             </p>
             <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-              {currentStageObj.icon} {isHindi ? currentStageObj.labelHi : currentStageObj.label}
+              {currentStageObj.icon} {isHindi ? currentStageObj.labelHi : currentStageObj.labelEn}
             </span>
           </div>
 
@@ -162,10 +173,16 @@ export default function GrowthCareGuidePage() {
                   <span className="text-xl shrink-0">{s.icon}</span>
                   <div className="min-w-0">
                     <span className="font-black block truncate">
-                      {isHindi ? s.labelHi.split(' ')[0] : s.label}
+                      {isHindi ? s.labelHi.split(' ')[0] : s.labelEn.split(' ')[0]}
                     </span>
                     <span className="text-[10px] font-medium text-slate-400 block">
-                      {s.id === 'germination' ? '0-21 Days' : s.id === 'vegetative' ? '21-60 Days' : s.id === 'flowering' ? '60-90 Days' : '90+ Days'}
+                      {s.id === 'germination'
+                        ? (isHindi ? '0-21 दिन' : '0-21 Days')
+                        : s.id === 'vegetative'
+                        ? (isHindi ? '21-60 दिन' : '21-60 Days')
+                        : s.id === 'flowering'
+                        ? (isHindi ? '60-90 दिन' : '60-90 Days')
+                        : (isHindi ? '90+ दिन' : '90+ Days')}
                     </span>
                   </div>
                 </button>
@@ -193,9 +210,9 @@ export default function GrowthCareGuidePage() {
             
             <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-emerald-200 dark:border-emerald-800 text-xs font-semibold space-y-2 text-slate-700 dark:text-slate-300">
               <p className="font-black text-sm text-slate-900 dark:text-white">
-                {crop === 'Wheat'
+                {activeCropEn === 'Wheat'
                   ? (isHindi ? 'यूरिया 33 किग्रा/एकड़ + जिंक सल्फेट 5 किग्रा/एकड़' : 'Urea 33 kg/acre + Zinc Sulphate 5 kg/acre')
-                  : crop === 'Rice'
+                  : activeCropEn === 'Rice'
                   ? (isHindi ? 'N:P:K 60:30:30 किग्रा/एकड़ संतुलित मात्रा' : 'N:P:K 60:30:30 kg/acre balanced dose')
                   : (isHindi ? 'कैल्शियम नाइट्रेट 3 ग्राम/लीटर पानी स्प्रे करें' : 'Calcium Nitrate 3g/L water spray for fruit strength')}
               </p>
@@ -245,7 +262,7 @@ export default function GrowthCareGuidePage() {
 
             <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-amber-200 dark:border-amber-800 text-xs font-semibold space-y-2 text-slate-700 dark:text-slate-300">
               <p className="font-black text-sm text-amber-900 dark:text-amber-300">
-                {crop === 'Wheat'
+                {activeCropEn === 'Wheat'
                   ? (isHindi ? 'पीला रतुआ (Yellow Rust) की पत्तियों पर पीली धारियां जांचें' : 'Check leaf undersides for Yellow Rust stripes')
                   : (isHindi ? 'अगेती झुलसा और कीट प्रकोप की निगरानी करें' : 'Monitor early blight and sucking pests weekly')}
               </p>
