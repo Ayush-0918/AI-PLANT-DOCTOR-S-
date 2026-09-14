@@ -65,6 +65,63 @@ const CATEGORY_ICONS: Record<string, { color: string; bg: string; border: string
   Rental:     { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.2)',  icon: Tent },
 };
 
+// ─── Nearby Peer Equipment Owners ──────────────────────────
+const NEARBY_OWNERS = [
+  {
+    id: 'owner_1',
+    name: 'Gurdev Singh (Farmer Aggregator)',
+    distance: '1.2 km away',
+    village: 'Lambra, Jalandhar',
+    rating: 4.9,
+    rentalsCount: 48,
+    badge: 'Verified Farmer',
+    operatorAvailable: true,
+    deliveryAvailable: true,
+    phone: '+91 98765 43210',
+    avatar: '👨‍🌾',
+  },
+  {
+    id: 'owner_2',
+    name: 'Guru Nanak Agri Machinery Hub',
+    distance: '2.5 km away',
+    village: 'Nakodar Road, Jalandhar',
+    rating: 4.8,
+    rentalsCount: 112,
+    badge: 'Cooperative Hub',
+    operatorAvailable: true,
+    deliveryAvailable: true,
+    phone: '+91 98123 45678',
+    avatar: '🚜',
+  },
+  {
+    id: 'owner_3',
+    name: 'Harpreet Singh (Progressive Farmer)',
+    distance: '3.8 km away',
+    village: 'Kalyanpur, Punjab',
+    rating: 5.0,
+    rentalsCount: 19,
+    badge: 'Peer Owner',
+    operatorAvailable: false,
+    deliveryAvailable: true,
+    phone: '+91 98555 12345',
+    avatar: '🌾',
+  },
+];
+
+const getRentalDailyRateNum = (priceStr: string): number => {
+  const raw = String(priceStr || '').replace(/[^\d.]/g, '');
+  const num = parseFloat(raw) || 0;
+  if (num >= 500000) return 1200; // Tractors e.g. ₹5.5L -> ₹1,200/day
+  if (num >= 100000) return 800;  // Drone / Harvester -> ₹800/day
+  if (num >= 10000)  return 350;  // Tiller / Rotavator -> ₹350/day
+  return 150;                      // Small tools / sprayers -> ₹150/day
+};
+
+const getRentalDailyRateStr = (priceStr: string): string => {
+  const rate = getRentalDailyRateNum(priceStr);
+  return `₹${rate.toLocaleString('en-IN')}`;
+};
+
 // ─── Main Page ─────────────────────────────────────────────
 export default function MarketplacePage() {
   const searchParams = useSearchParams();
@@ -82,9 +139,16 @@ export default function MarketplacePage() {
   const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [retryingEmail, setRetryingEmail] = useState(false);
+
+  // Peer Rental specialized state
+  const [selectedOwnerId, setSelectedOwnerId] = useState('owner_1');
+  const [includeOperator, setIncludeOperator] = useState(true);
+  const [includeDelivery, setIncludeDelivery] = useState(true);
+  const [startDate, setStartDate] = useState('2026-09-16');
+
   const [form, setForm] = useState<OrderForm>({
     buyer_name: 'Ayush Pandey', buyer_phone: '', buyer_email: 'rdxayushpandey00@gmail.com',
-    buyer_address: '', quantity: 1, rental_days: 1,
+    buyer_address: '', quantity: 1, rental_days: 2,
   });
 
   const handleRetryEmail = async () => {
@@ -176,7 +240,21 @@ export default function MarketplacePage() {
     setCheckoutStep('form');
     setPaymentMethod('upi_qr');
     setOrderResult(null);
-    setForm({ buyer_name: 'Ayush Pandey', buyer_phone: '', buyer_email: 'rdxayushpandey00@gmail.com', buyer_address: '', quantity: 1, rental_days: 1 });
+
+    // Default rental state
+    setSelectedOwnerId('owner_1');
+    setIncludeOperator(true);
+    setIncludeDelivery(true);
+    setStartDate('2026-09-16');
+
+    setForm({
+      buyer_name: 'Ayush Pandey',
+      buyer_phone: '',
+      buyer_email: 'rdxayushpandey00@gmail.com',
+      buyer_address: '',
+      quantity: 1,
+      rental_days: type === 'rent' ? 2 : 1,
+    });
   };
 
   const loadRazorpayScript = () => {
@@ -206,10 +284,22 @@ export default function MarketplacePage() {
         cod: 'Pending (COD)',
       };
 
+      const isRentOrder = checkoutType === 'rent';
+      const dailyRateNum = getRentalDailyRateNum(checkoutProduct.price);
+      const operatorCost = (isRentOrder && includeOperator) ? (400 * form.rental_days) : 0;
+      const deliveryCost = (isRentOrder && includeDelivery) ? 200 : 0;
+      const depositCost = isRentOrder ? 500 : 0;
+      const baseRentTotal = dailyRateNum * form.rental_days;
+      const totalRentPayableNum = isRentOrder ? (baseRentTotal + operatorCost + deliveryCost + depositCost) : 0;
+
+      const displayPrice = isRentOrder
+        ? `₹${dailyRateNum}/day (Total: ₹${totalRentPayableNum.toLocaleString('en-IN')})`
+        : checkoutProduct.price;
+
       const payload = {
         product_id: String(checkoutProduct.id),
         product_title: checkoutProduct.title,
-        product_price: checkoutProduct.price,
+        product_price: displayPrice,
         category: checkoutProduct.category,
         buyer_name: form.buyer_name.trim(),
         buyer_phone: form.buyer_phone.trim(),
@@ -217,7 +307,7 @@ export default function MarketplacePage() {
         buyer_address: form.buyer_address.trim() || null,
         quantity: form.quantity,
         order_type: checkoutType,
-        rental_days: checkoutType === 'rent' ? form.rental_days : null,
+        rental_days: isRentOrder ? form.rental_days : null,
         payment_method: methodLabelMap[paymentMethod],
         payment_status: methodStatusMap[paymentMethod],
       };
@@ -505,56 +595,50 @@ export default function MarketplacePage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between mt-2 pt-1">
-                        <div>
-                          <span className="text-lg font-black text-slate-900">{product.price}</span>
-                          {isMachine && (
-                            <span className="text-[9px] block font-extrabold text-slate-400 leading-tight">Buy & Rent available</span>
+                      {/* Clean 2-Row Price & Action Section (No Overflow/Clipping) */}
+                      <div className="mt-3 pt-2 border-t border-slate-100 space-y-2">
+                        <div className="flex items-baseline justify-between">
+                          <div>
+                            <span className="text-base font-black text-slate-900">{product.price}</span>
+                            <span className="text-[9px] block font-extrabold text-slate-400 leading-tight">Buy Outright</span>
+                          </div>
+                          {(isMachine || isRental) && (
+                            <div className="text-right">
+                              <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">{getRentalDailyRateStr(product.price)}/day</span>
+                              <span className="text-[9px] block font-extrabold text-blue-500 leading-tight">Peer Rental</span>
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {isMachine ? (
-                            <>
-                              <button
-                                onClick={() => { if (navigator.vibrate) navigator.vibrate(12); setShowEMI(product); }}
-                                className="h-9 w-9 rounded-xl flex items-center justify-center bg-violet-50 border border-violet-200/80 hover:bg-violet-100 transition-colors"
-                                title="EMI Calculator"
-                              >
-                                <Calculator size={14} className="text-violet-600" />
-                              </button>
 
-                              <motion.button
-                                whileTap={{ scale: 0.92 }}
-                                onClick={() => openCheckout(product, 'buy')}
-                                className="h-9 px-3 rounded-xl flex items-center gap-1 font-black text-[11px] text-white"
-                                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.25)' }}
-                              >
-                                <ShoppingCart size={12} className="text-white" />
-                                <span>{t('shop_btn_buy')}</span>
-                              </motion.button>
-
-                              <motion.button
-                                whileTap={{ scale: 0.92 }}
-                                onClick={() => openCheckout(product, 'rent')}
-                                className="h-9 px-3 rounded-xl flex items-center gap-1 font-black text-[11px] text-white"
-                                style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 4px 12px rgba(59,130,246,0.25)' }}
-                              >
-                                <Clock size={12} className="text-white" />
-                                <span>{t('shop_btn_rent')}</span>
-                              </motion.button>
-                            </>
-                          ) : (
-                            <motion.button
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => openCheckout(product, isRental ? 'rent' : 'buy')}
-                              className="h-9 px-4 rounded-xl flex items-center gap-1.5 font-black text-xs text-white"
-                              style={isRental
-                                ? { background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 4px 12px rgba(59,130,246,0.3)' }
-                                : { background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }
-                              }
+                        {/* Action Buttons Row */}
+                        <div className="flex items-center gap-1.5 w-full">
+                          {isMachine && (
+                            <button
+                              onClick={() => { if (navigator.vibrate) navigator.vibrate(12); setShowEMI(product); }}
+                              className="h-9 px-2 rounded-xl flex items-center justify-center bg-violet-50 border border-violet-200 text-violet-700 font-extrabold text-[11px] shrink-0 hover:bg-violet-100 transition-colors"
+                              title="EMI Calculator"
                             >
-                              {isRental ? <Clock size={13} className="text-white" /> : <ShoppingCart size={13} className="text-white" />}
-                              <span>{isRental ? t('shop_btn_rent') : t('shop_btn_buy')}</span>
+                              <Calculator size={13} className="mr-0.5 text-violet-600" /> EMI
+                            </button>
+                          )}
+
+                          <motion.button
+                            whileTap={{ scale: 0.93 }}
+                            onClick={() => openCheckout(product, 'buy')}
+                            className="flex-1 h-9 px-2 rounded-xl flex items-center justify-center gap-1 font-black text-[11px] text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm hover:brightness-105"
+                          >
+                            <ShoppingCart size={12} />
+                            <span>{t('shop_btn_buy')}</span>
+                          </motion.button>
+
+                          {(isMachine || isRental) && (
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => openCheckout(product, 'rent')}
+                              className="flex-1 h-9 px-2 rounded-xl flex items-center justify-center gap-1 font-black text-[11px] text-white bg-gradient-to-r from-blue-500 to-blue-600 shadow-sm hover:brightness-105"
+                            >
+                              <Clock size={12} />
+                              <span>{t('shop_btn_rent')}</span>
                             </motion.button>
                           )}
                         </div>
@@ -631,91 +715,226 @@ export default function MarketplacePage() {
 
                 <AnimatePresence mode="wait">
 
-                  {/* ── STEP 1: ADDRESS & CONTACT ── */}
+                  {/* ── STEP 1: RENTAL / BUY CONFIGURATION ── */}
                   {checkoutStep === 'form' && (
                     <motion.div key="form" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-4 pt-1">
-                      {/* Compact Item Badge */}
-                      <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/70">
-                        <div>
-                          <p className="font-extrabold text-slate-900 text-sm">{checkoutProduct.title}</p>
-                          <p className="text-xs text-slate-400">{checkoutProduct.seller}</p>
+                      {checkoutType === 'rent' ? (
+                        /* ── PEER-TO-PEER RENTAL HUB STEP 1 ── */
+                        <div className="space-y-3.5">
+                          {/* Rental Daily Rate Badge */}
+                          <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200/80 flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-blue-600 text-white rounded-md">Peer-to-Peer Rental</span>
+                                <p className="font-extrabold text-slate-900 text-sm">{checkoutProduct.title}</p>
+                              </div>
+                              <p className="text-xs text-blue-700 font-bold mt-0.5">Auto-calculated Daily Rate</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-lg font-black text-blue-600">{getRentalDailyRateStr(checkoutProduct.price)}</span>
+                              <span className="text-[10px] block font-extrabold text-blue-500">/ day</span>
+                            </div>
+                          </div>
+
+                          {/* Nearby Equipment Owners Selector */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1">
+                                <MapPin size={13} className="text-blue-600" />
+                                <span>Connect Nearby Verified Machinery Owner</span>
+                              </h4>
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">📍 Within 5 km</span>
+                            </div>
+
+                            <div className="space-y-2">
+                              {NEARBY_OWNERS.map((owner) => {
+                                const isSelected = selectedOwnerId === owner.id;
+                                return (
+                                  <div
+                                    key={owner.id}
+                                    onClick={() => setSelectedOwnerId(owner.id)}
+                                    className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
+                                      isSelected
+                                        ? 'bg-blue-50/80 border-blue-500 ring-1 ring-blue-500'
+                                        : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100/70'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5">
+                                      <span className="text-xl">{owner.avatar}</span>
+                                      <div>
+                                        <div className="flex items-center gap-1.5">
+                                          <p className="font-bold text-slate-900 text-xs">{owner.name}</p>
+                                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">{owner.badge}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 font-medium">{owner.village} • <span className="font-bold text-blue-600">{owner.distance}</span> • ★ {owner.rating} ({owner.rentalsCount} rentals)</p>
+                                      </div>
+                                    </div>
+                                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
+                                      {isSelected && <Check size={10} className="text-white" />}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Duration & Rental Add-ons */}
+                          <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">Rental Duration</p>
+                                <p className="text-[10px] text-slate-400">Select days required</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setForm(f => ({ ...f, rental_days: Math.max(1, f.rental_days - 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">−</button>
+                                <span className="font-extrabold text-slate-900 w-6 text-center text-sm">{form.rental_days}</span>
+                                <button type="button" onClick={() => setForm(f => ({ ...f, rental_days: Math.min(30, f.rental_days + 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">+</button>
+                                <span className="text-xs text-slate-500 font-bold">day(s)</span>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-slate-200 pt-2 space-y-2">
+                              <label className="flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer">
+                                <span>Include Experienced Driver / Operator (+₹400/day)</span>
+                                <input type="checkbox" checked={includeOperator} onChange={(e) => setIncludeOperator(e.target.checked)} className="h-4 w-4 rounded text-blue-600 accent-blue-600" />
+                              </label>
+                              <label className="flex items-center justify-between text-xs font-bold text-slate-700 cursor-pointer">
+                                <span>Field Doorstep Delivery & Pickup (+₹200)</span>
+                                <input type="checkbox" checked={includeDelivery} onChange={(e) => setIncludeDelivery(e.target.checked)} className="h-4 w-4 rounded text-blue-600 accent-blue-600" />
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* Dynamic Transparent Rental Price Box */}
+                          <div className="p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200 space-y-1.5 text-xs">
+                            <div className="flex justify-between text-slate-600 font-medium">
+                              <span>Machine Rent ({getRentalDailyRateStr(checkoutProduct.price)} × {form.rental_days} days)</span>
+                              <span className="font-bold text-slate-900">₹{(getRentalDailyRateNum(checkoutProduct.price) * form.rental_days).toLocaleString('en-IN')}</span>
+                            </div>
+                            {includeOperator && (
+                              <div className="flex justify-between text-slate-600 font-medium">
+                                <span>Driver Operator Fee (₹400 × {form.rental_days} days)</span>
+                                <span className="font-bold text-slate-900">₹{(400 * form.rental_days).toLocaleString('en-IN')}</span>
+                              </div>
+                            )}
+                            {includeDelivery && (
+                              <div className="flex justify-between text-slate-600 font-medium">
+                                <span>Doorstep Field Transport</span>
+                                <span className="font-bold text-slate-900">₹200</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-slate-600 font-medium">
+                              <span>Security Deposit (Refundable)</span>
+                              <span className="font-bold text-emerald-600">₹500</span>
+                            </div>
+                            <div className="border-t border-blue-200 pt-1.5 flex justify-between font-black text-sm text-blue-900">
+                              <span>Total Booking Payment</span>
+                              <span>₹{(getRentalDailyRateNum(checkoutProduct.price) * form.rental_days + (includeOperator ? 400 * form.rental_days : 0) + (includeDelivery ? 200 : 0) + 500).toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setCheckoutStep('payment')}
+                            className="w-full py-3.5 rounded-2xl font-extrabold text-white text-sm flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20"
+                          >
+                            Continue: Customer & Field Address <ChevronRight size={16} />
+                          </motion.button>
                         </div>
-                        <span className="text-base font-black text-emerald-600">{checkoutProduct.price}</span>
-                      </div>
+                      ) : (
+                        /* ── DIRECT BUY STEP 1 ── */
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/70">
+                            <div>
+                              <p className="font-extrabold text-slate-900 text-sm">{checkoutProduct.title}</p>
+                              <p className="text-xs text-slate-400">{checkoutProduct.seller}</p>
+                            </div>
+                            <span className="text-base font-black text-emerald-600">{checkoutProduct.price}</span>
+                          </div>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <h3 className="text-sm font-extrabold text-slate-800">Customer & Delivery Info</h3>
-                        <button
-                          type="button"
-                          onClick={fetchLiveLocation}
-                          disabled={locating}
-                          className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
-                        >
-                          {locating ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
-                          <span>{locating ? 'Locating...' : '📍 Auto-GPS'}</span>
-                        </button>
-                      </div>
+                          <div className="flex items-center justify-between pt-1">
+                            <h3 className="text-sm font-extrabold text-slate-800">Customer & Delivery Info</h3>
+                            <button
+                              type="button"
+                              onClick={fetchLiveLocation}
+                              disabled={locating}
+                              className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+                            >
+                              {locating ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
+                              <span>{locating ? 'Locating...' : '📍 Auto-GPS'}</span>
+                            </button>
+                          </div>
 
-                      {/* Clean Input Fields */}
-                      <div className="space-y-2.5">
-                        <FormField icon={<User size={15} />} placeholder="Full Name *" value={form.buyer_name} onChange={(v) => setForm(f => ({ ...f, buyer_name: v }))} type="text" />
-                        <FormField icon={<Phone size={15} />} placeholder="Phone Number * (+91...)" value={form.buyer_phone} onChange={(v) => setForm(f => ({ ...f, buyer_phone: v }))} type="tel" />
-                        <FormField icon={<Mail size={15} />} placeholder="Gmail Address *" value={form.buyer_email} onChange={(v) => setForm(f => ({ ...f, buyer_email: v }))} type="email" />
-                        <FormField icon={<MapPin size={15} />} placeholder="Delivery Address *" value={form.buyer_address} onChange={(v) => setForm(f => ({ ...f, buyer_address: v }))} type="text" />
+                          <div className="space-y-2.5">
+                            <FormField icon={<User size={15} />} placeholder="Full Name *" value={form.buyer_name} onChange={(v) => setForm(f => ({ ...f, buyer_name: v }))} type="text" />
+                            <FormField icon={<Phone size={15} />} placeholder="Phone Number * (+91...)" value={form.buyer_phone} onChange={(v) => setForm(f => ({ ...f, buyer_phone: v }))} type="tel" />
+                            <FormField icon={<Mail size={15} />} placeholder="Gmail Address *" value={form.buyer_email} onChange={(v) => setForm(f => ({ ...f, buyer_email: v }))} type="email" />
+                            <FormField icon={<MapPin size={15} />} placeholder="Delivery Address *" value={form.buyer_address} onChange={(v) => setForm(f => ({ ...f, buyer_address: v }))} type="text" />
 
-                        {checkoutType === 'rent' ? (
-                          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
-                            <span className="text-xs font-bold text-slate-600">{t('shop_rental_dur')}</span>
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => setForm(f => ({ ...f, rental_days: Math.max(1, f.rental_days - 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">−</button>
-                              <span className="font-extrabold text-slate-900 w-6 text-center">{form.rental_days}</span>
-                              <button onClick={() => setForm(f => ({ ...f, rental_days: Math.min(30, f.rental_days + 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">+</button>
-                              <span className="text-xs text-slate-400">days</span>
+                            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                              <span className="text-xs font-bold text-slate-600">{t('shop_qty')}</span>
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => setForm(f => ({ ...f, quantity: Math.max(1, f.quantity - 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">−</button>
+                                <span className="font-extrabold text-slate-900 w-6 text-center">{form.quantity}</span>
+                                <button onClick={() => setForm(f => ({ ...f, quantity: Math.min(99, f.quantity + 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">+</button>
+                                <span className="text-xs text-slate-400">units</span>
+                              </div>
                             </div>
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
-                            <span className="text-xs font-bold text-slate-600">{t('shop_qty')}</span>
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => setForm(f => ({ ...f, quantity: Math.max(1, f.quantity - 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">−</button>
-                              <span className="font-extrabold text-slate-900 w-6 text-center">{form.quantity}</span>
-                              <button onClick={() => setForm(f => ({ ...f, quantity: Math.min(99, f.quantity + 1) }))} className="h-7 w-7 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">+</button>
-                              <span className="text-xs text-slate-400">units</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
 
-                      <motion.button
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => { if (form.buyer_name && form.buyer_phone) setCheckoutStep('payment'); }}
-                        disabled={!form.buyer_name || !form.buyer_phone}
-                        className="w-full py-3.5 rounded-2xl font-extrabold text-white text-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-40"
-                      >
-                        Continue to Payment <ChevronRight size={16} />
-                      </motion.button>
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => { if (form.buyer_name && form.buyer_phone) setCheckoutStep('payment'); }}
+                            disabled={!form.buyer_name || !form.buyer_phone}
+                            className="w-full py-3.5 rounded-2xl font-extrabold text-white text-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-40"
+                          >
+                            Continue to Payment <ChevronRight size={16} />
+                          </motion.button>
+                        </div>
+                      )}
                     </motion.div>
                   )}
 
-                  {/* ── STEP 2: PAYMENT OPTIONS ── */}
+                  {/* ── STEP 2: PAYMENT & ADDRESS ── */}
                   {checkoutStep === 'payment' && (
-                    <motion.div key="payment" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-3 pt-1">
-                      <h3 className="text-sm font-extrabold text-slate-800">Select Payment Mode</h3>
+                    <motion.div key="payment" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-3.5 pt-1">
+                      {checkoutType === 'rent' && (
+                        <div className="space-y-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-extrabold text-slate-800">Customer & Field Address</h3>
+                            <button
+                              type="button"
+                              onClick={fetchLiveLocation}
+                              disabled={locating}
+                              className="text-[10px] font-bold text-blue-600 flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"
+                            >
+                              {locating ? <Loader2 size={10} className="animate-spin" /> : <MapPin size={10} />}
+                              <span>📍 Auto-GPS</span>
+                            </button>
+                          </div>
+                          <FormField icon={<User size={14} />} placeholder="Full Name *" value={form.buyer_name} onChange={(v) => setForm(f => ({ ...f, buyer_name: v }))} type="text" />
+                          <FormField icon={<Phone size={14} />} placeholder="Phone Number * (+91...)" value={form.buyer_phone} onChange={(v) => setForm(f => ({ ...f, buyer_phone: v }))} type="tel" />
+                          <FormField icon={<Mail size={14} />} placeholder="Gmail Address *" value={form.buyer_email} onChange={(v) => setForm(f => ({ ...f, buyer_email: v }))} type="email" />
+                          <FormField icon={<MapPin size={14} />} placeholder="Field Delivery Address *" value={form.buyer_address} onChange={(v) => setForm(f => ({ ...f, buyer_address: v }))} type="text" />
+                        </div>
+                      )}
+
+                      <h3 className="text-xs font-extrabold text-slate-800">Select Payment Mode</h3>
 
                       {/* Payment Cards */}
-                      <div className="space-y-2.5">
+                      <div className="space-y-2">
                         {/* Razorpay */}
                         <div
                           onClick={() => setPaymentMethod('razorpay')}
-                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                          className={`p-3 rounded-2xl border cursor-pointer transition-all ${
                             paymentMethod === 'razorpay'
                               ? 'bg-emerald-50/60 border-emerald-500 ring-1 ring-emerald-500'
                               : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <CreditCard size={18} className={paymentMethod === 'razorpay' ? 'text-emerald-600' : 'text-slate-400'} />
+                            <div className="flex items-center gap-2.5">
+                              <CreditCard size={16} className={paymentMethod === 'razorpay' ? 'text-emerald-600' : 'text-slate-400'} />
                               <div>
                                 <p className="font-bold text-slate-900 text-xs">Online Payment (Razorpay)</p>
                                 <p className="text-[10px] text-slate-400">Cards, UPI, NetBanking</p>
@@ -730,15 +949,15 @@ export default function MarketplacePage() {
                         {/* UPI QR Code */}
                         <div
                           onClick={() => setPaymentMethod('upi_qr')}
-                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                          className={`p-3 rounded-2xl border cursor-pointer transition-all ${
                             paymentMethod === 'upi_qr'
                               ? 'bg-purple-50/60 border-purple-500 ring-1 ring-purple-500'
                               : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <QrCode size={18} className={paymentMethod === 'upi_qr' ? 'text-purple-600' : 'text-slate-400'} />
+                            <div className="flex items-center gap-2.5">
+                              <QrCode size={16} className={paymentMethod === 'upi_qr' ? 'text-purple-600' : 'text-slate-400'} />
                               <div>
                                 <div className="flex items-center gap-1.5">
                                   <p className="font-bold text-slate-900 text-xs">Scan UPI QR Code</p>
@@ -753,15 +972,15 @@ export default function MarketplacePage() {
                           </div>
 
                           {paymentMethod === 'upi_qr' && (
-                            <div className="mt-3 pt-3 border-t border-purple-100 text-center space-y-2">
+                            <div className="mt-2.5 pt-2.5 border-t border-purple-100 text-center space-y-1.5">
                               <div className="bg-white p-2 rounded-xl inline-block border border-slate-200 shadow-sm">
                                 <img
-                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=plantdoctors@upi%26pn=PlantDoctors%26am=${encodeURIComponent(checkoutProduct.price.replace(/[^\d.]/g, ''))}%26cu=INR`}
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=upi://pay?pa=plantdoctors@upi%26pn=PlantDoctors%26am=1200%26cu=INR`}
                                   alt="UPI QR Code"
-                                  className="w-32 h-32 mx-auto"
+                                  className="w-28 h-28 mx-auto"
                                 />
                               </div>
-                              <p className="text-xs font-bold text-slate-700">Pay <span className="text-emerald-600 font-extrabold">{checkoutProduct.price}</span> to <span className="text-purple-700 font-bold">plantdoctors@upi</span></p>
+                              <p className="text-xs font-bold text-slate-700">Pay to <span className="text-purple-700 font-bold">plantdoctors@upi</span></p>
                             </div>
                           )}
                         </div>
@@ -769,18 +988,18 @@ export default function MarketplacePage() {
                         {/* Cash on Delivery */}
                         <div
                           onClick={() => setPaymentMethod('cod')}
-                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                          className={`p-3 rounded-2xl border cursor-pointer transition-all ${
                             paymentMethod === 'cod'
                               ? 'bg-amber-50/60 border-amber-500 ring-1 ring-amber-500'
                               : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Truck size={18} className={paymentMethod === 'cod' ? 'text-amber-600' : 'text-slate-400'} />
+                            <div className="flex items-center gap-2.5">
+                              <Truck size={16} className={paymentMethod === 'cod' ? 'text-amber-600' : 'text-slate-400'} />
                               <div>
-                                <p className="font-bold text-slate-900 text-xs">Cash on Delivery (COD)</p>
-                                <p className="text-[10px] text-slate-400">Pay cash upon item arrival</p>
+                                <p className="font-bold text-slate-900 text-xs">Pay Upon Equipment Delivery</p>
+                                <p className="text-[10px] text-slate-400">Cash/UPI to driver upon arrival</p>
                               </div>
                             </div>
                             <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${paymentMethod === 'cod' ? 'border-amber-600 bg-amber-600' : 'border-slate-300'}`}>
@@ -790,7 +1009,7 @@ export default function MarketplacePage() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2.5 pt-2">
+                      <div className="flex gap-2.5 pt-1">
                         <button
                           onClick={() => setCheckoutStep('form')}
                           className="flex-1 py-3 rounded-2xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs"
@@ -799,34 +1018,47 @@ export default function MarketplacePage() {
                         </button>
                         <motion.button
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => setCheckoutStep('review')}
-                          className="flex-[2] py-3 rounded-2xl font-extrabold text-white text-xs bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20"
+                          onClick={() => { if (form.buyer_name && form.buyer_phone) setCheckoutStep('review'); }}
+                          disabled={!form.buyer_name || !form.buyer_phone}
+                          className={`flex-[2] py-3 rounded-2xl font-extrabold text-white text-xs transition-colors shadow-md disabled:opacity-40 ${
+                            checkoutType === 'rent' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                          }`}
                         >
-                          Review Order <ChevronRight size={14} className="inline" />
+                          Review Rental Summary <ChevronRight size={14} className="inline" />
                         </motion.button>
                       </div>
                     </motion.div>
                   )}
 
-                  {/* ── STEP 3: SUMMARY ── */}
+                  {/* ── STEP 3: SUMMARY & CONFIRM ── */}
                   {checkoutStep === 'review' && (
                     <motion.div key="review" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} className="space-y-3.5 pt-1">
-                      <h3 className="text-sm font-extrabold text-slate-800">Order Summary</h3>
+                      <h3 className="text-sm font-extrabold text-slate-800">{checkoutType === 'rent' ? 'Peer Rental Agreement Summary' : 'Order Summary'}</h3>
 
                       <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
                         <ReviewRow label="Product" value={checkoutProduct.title} />
-                        <ReviewRow label="Price" value={`${checkoutProduct.price}${checkoutType === 'rent' ? ` × ${form.rental_days} day(s)` : ` × ${form.quantity}`}`} highlight />
+                        {checkoutType === 'rent' ? (
+                          <>
+                            <ReviewRow label="Rental Rate" value={`${getRentalDailyRateStr(checkoutProduct.price)} / day`} highlight />
+                            <ReviewRow label="Rental Duration" value={`${form.rental_days} Day(s)`} />
+                            <ReviewRow label="Connected Owner" value={NEARBY_OWNERS.find(o => o.id === selectedOwnerId)?.name || 'Gurdev Singh'} />
+                            <ReviewRow label="Driver Operator" value={includeOperator ? 'Yes (+₹400/day)' : 'No'} />
+                            <ReviewRow label="Field Transport" value={includeDelivery ? 'Yes (+₹200)' : 'No'} />
+                          </>
+                        ) : (
+                          <ReviewRow label="Price" value={`${checkoutProduct.price} × ${form.quantity}`} highlight />
+                        )}
                         <ReviewRow label="Payment Mode" value={paymentMethod === 'razorpay' ? 'Razorpay Online' : paymentMethod === 'upi_qr' ? 'UPI QR Code' : 'Cash on Delivery'} />
                         <div className="border-t border-slate-200 my-1.5" />
-                        <ReviewRow label="Name" value={form.buyer_name} />
+                        <ReviewRow label="Customer" value={form.buyer_name} />
                         <ReviewRow label="Phone" value={form.buyer_phone} />
-                        {form.buyer_email && <ReviewRow label="Gmail" value={form.buyer_email} />}
-                        {form.buyer_address && <ReviewRow label="Address" value={form.buyer_address} />}
+                        {form.buyer_email && <ReviewRow label="Gmail Receipt" value={form.buyer_email} />}
+                        {form.buyer_address && <ReviewRow label="Field Location" value={form.buyer_address} />}
                       </div>
 
-                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2 text-xs text-emerald-800 font-medium">
-                        <Mail size={14} className="shrink-0 text-emerald-600" />
-                        <span>Confirmation email will be dispatched to <strong className="text-slate-900">{form.buyer_email || 'your email'}</strong>.</span>
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center gap-2 text-xs text-blue-900 font-medium">
+                        <Mail size={14} className="shrink-0 text-blue-600" />
+                        <span>Real transactional rental receipt will arrive in <strong className="text-slate-900">{form.buyer_email || 'your email'}</strong>.</span>
                       </div>
 
                       <div className="flex gap-2.5 pt-1">
@@ -840,9 +1072,11 @@ export default function MarketplacePage() {
                           whileTap={{ scale: 0.98 }}
                           onClick={submitOrder}
                           disabled={submitting}
-                          className="flex-[2] py-3 rounded-2xl font-extrabold text-white text-xs bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20"
+                          className={`flex-[2] py-3 rounded-2xl font-extrabold text-white text-xs transition-colors shadow-md ${
+                            checkoutType === 'rent' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                          }`}
                         >
-                          {submitting ? <Loader2 size={16} className="animate-spin mx-auto" /> : <><CheckCircle2 size={15} className="inline mr-1" /> Place & Confirm Order</>}
+                          {submitting ? <Loader2 size={16} className="animate-spin mx-auto" /> : <><CheckCircle2 size={15} className="inline mr-1" /> {checkoutType === 'rent' ? 'Confirm & Book Rental' : 'Place & Confirm Order'}</>}
                         </motion.button>
                       </div>
                     </motion.div>

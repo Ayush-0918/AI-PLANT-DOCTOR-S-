@@ -368,7 +368,8 @@ async def place_order(req: PlaceOrderRequest):
     if req.buyer_email and "@" in req.buyer_email:
         raw_num = re.sub(r"[^\d.]", "", str(req.product_price or "0"))
         unit_price_float = float(raw_num) if raw_num else 0.0
-        total_price_formatted = f"₹{int(unit_price_float * req.quantity):,}" if unit_price_float > 0 else req.product_price
+        mult = (req.rental_days or 1) if req.order_type == "rent" else (req.quantity or 1)
+        total_price_formatted = f"₹{int(unit_price_float * mult):,}" if unit_price_float > 0 else req.product_price
 
         email_dispatch = send_order_confirmation_email(
             buyer_email=req.buyer_email.strip(),
@@ -376,12 +377,14 @@ async def place_order(req: PlaceOrderRequest):
             order_id=order_id,
             product_title=req.product_title,
             product_price=req.product_price,
-            quantity=req.quantity,
+            quantity=req.quantity or 1,
             total_amount=total_price_formatted,
             payment_method=payment_method,
             payment_status=payment_status,
             buyer_address=req.buyer_address,
             order_date=datetime.now(timezone.utc).strftime("%d %b %Y, %I:%M %p UTC"),
+            order_type=req.order_type,
+            rental_days=req.rental_days,
         )
         email_res["sent"] = email_dispatch.get("sent", False)
         email_res["message"] = f"Confirmation email sent to {req.buyer_email.strip()}" if email_res["sent"] else (email_dispatch.get("error") or "Email dispatch failed")

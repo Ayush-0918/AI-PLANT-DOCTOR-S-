@@ -33,10 +33,12 @@ def send_order_confirmation_email(
     payment_status: str,
     buyer_address: Optional[str] = None,
     order_date: Optional[str] = None,
+    order_type: str = "buy",
+    rental_days: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Dispatches a real transactional order confirmation email using Resend API.
-    Does NOT simulate success: returns sent=True only when Resend accepts the email request.
+    Supports both Direct Buy and Peer-to-Peer Rental receipts.
     """
     if _ENV_PATH.exists():
         load_dotenv(_ENV_PATH, override=True)
@@ -59,10 +61,12 @@ def send_order_confirmation_email(
     # Extract price calculations
     raw_num = re.sub(r"[^\d.]", "", str(product_price or "0"))
     unit_price = float(raw_num) if raw_num else 0.0
-    subtotal_val = unit_price * quantity
+    mult = (rental_days or 1) if order_type == "rent" else (quantity or 1)
+    subtotal_val = unit_price * mult
     subtotal_str = f"₹{int(subtotal_val):,}" if subtotal_val > 0 else product_price
 
-    subject = f"Order Confirmed — #{order_id}"
+    is_rent = order_type == "rent"
+    subject = f"Kisan Peer Rental Confirmed — #{order_id}" if is_rent else f"Order Confirmed — #{order_id}"
 
     html_content = f"""<!DOCTYPE html>
 <html>
