@@ -30,9 +30,9 @@ const FEATURES = [
   { id: 'guide',      icon: BookOpen,       label: 'Crop Guide',      labelHi: 'फसल गाइड',      href: '/guide',      color: '#0ea5e9', bg: '#f0f9ff' },
   { id: 'expert',     icon: Phone,          label: 'Expert Call',     labelHi: 'विशेषज्ञ कॉल',  href: '/expert',     color: '#ef4444', bg: '#fef2f2' },
   { id: 'weather',    icon: Thermometer,    label: 'Weather',         labelHi: 'मौसम',           href: '/dashboard',  color: '#06b6d4', bg: '#ecfeff' },
-  { id: 'dosage',     icon: Wheat,          label: 'Dosage Calc',     labelHi: 'खुराक कैलक.',    href: '/scanner',    color: '#65a30d', bg: '#f7fee7' },
+  { id: 'dosage',     icon: Wheat,          label: 'Dosage Calc',     labelHi: 'खुराक कैलक.',    href: '/dosage',     color: '#65a30d', bg: '#f7fee7' },
   { id: 'growth',     icon: BrainCircuit,   label: 'Growth Care',     labelHi: 'ग्रोथ केयर',    href: '/guide',      color: '#7c3aed', bg: '#f5f3ff' },
-  { id: 'history',    icon: History,        label: 'Scan History',    labelHi: 'स्कैन इतिहास',  href: '/dashboard',  color: '#475569', bg: '#f8fafc' },
+  { id: 'history',    icon: History,        label: 'Scan History',    labelHi: 'स्कैन इतिहास',  href: '/history',    color: '#475569', bg: '#f8fafc' },
   { id: 'admin',      icon: BarChart3,      label: 'AI Console',      labelHi: 'AI कंसोल',       href: '/admin',      color: '#db2777', bg: '#fdf2f8' },
 ];
 
