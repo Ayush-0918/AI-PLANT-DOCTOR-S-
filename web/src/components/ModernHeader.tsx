@@ -136,14 +136,7 @@ export default function ModernHeader() {
             </AnimatePresence>
           </div>
 
-          {/* Theme Toggle */}
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { toggleTheme(); triggerHaptic(); }}
-            className="rounded-full p-2 bg-white/85 dark:bg-slate-800/85 backdrop-blur-xl border border-slate-200/60 dark:border-slate-700/60 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-          >
-            {isDark ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-sky-500" />}
-          </motion.button>
+
 
           {/* ── HAMBURGER MENU ── */}
           <motion.button
