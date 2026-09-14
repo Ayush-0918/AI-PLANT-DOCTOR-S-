@@ -24,3 +24,4 @@ seaborn
 crewai
 crewai-tools
 langchain-openai
+resend>=2.0.0

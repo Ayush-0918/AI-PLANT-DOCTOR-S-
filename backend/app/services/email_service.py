@@ -205,107 +205,64 @@ def send_order_confirmation_email(
         "html": html_content,
     }
 
-    # 1. Try Resend Python SDK if available
+    owner_email = os.getenv("RESEND_DEFAULT_RECIPIENT", "rdxayushpandey00@gmail.com").strip()
+
+    def _send_via_sdk(to_addr: str) -> dict:
+        """Send using official Resend Python SDK (uses requests library, not urllib)."""
+        resend.api_key = api_key
+        res = resend.Emails.send({
+            "from": from_email,
+            "to": [to_addr.strip()],
+            "subject": subject,
+            "html": html_content,
+        })
+        email_id = res.get("id") if isinstance(res, dict) else getattr(res, "id", str(res))
+        return {"id": email_id}
+
+    # 1. Try sending to intended recipient via Resend SDK
     if resend:
         try:
-            resend.api_key = api_key
-            res = resend.Emails.send({
-                "from": from_email,
-                "to": [buyer_email.strip()],
-                "subject": subject,
-                "html": html_content,
-            })
-            email_id = res.get("id") if isinstance(res, dict) else getattr(res, "id", str(res))
-            logger.info(f"Order confirmation email sent via Resend SDK to {buyer_email} for order {order_id}. Resend ID: {email_id}")
+            sdk_result = _send_via_sdk(buyer_email)
+            logger.info(f"Order confirmation email sent via Resend SDK to {buyer_email} for order {order_id}. Resend ID: {sdk_result['id']}")
             return {
                 "sent": True,
                 "method": "resend_sdk",
-                "resend_id": email_id,
+                "resend_id": sdk_result["id"],
                 "recipient": buyer_email,
             }
         except Exception as exc:
-            logger.error(f"Resend SDK dispatch failed for order {order_id}: {exc}")
+            err_str = str(exc)
+            logger.warning(f"Resend SDK attempt to {buyer_email} failed for order {order_id}: {err_str}")
 
-    # 2. Direct HTTP REST API call to https://api.resend.com/emails
-    try:
-        req = urllib.request.Request(
-            "https://api.resend.com/emails",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "User-Agent": "PlantDoctors-Backend/1.0",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req) as resp:
-            resp_bytes = resp.read()
-            data = json.loads(resp_bytes.decode("utf-8")) if resp_bytes else {}
-            resend_id = data.get("id", "resend_ok")
-            logger.info(f"Order confirmation email sent via Resend REST API to {buyer_email} for order {order_id}. Resend ID: {resend_id}")
-            return {
-                "sent": True,
-                "method": "resend_rest",
-                "resend_id": resend_id,
-                "recipient": buyer_email,
-            }
-    except Exception as exc:
-        err_detail = str(exc)
-        if hasattr(exc, "read"):
-            try:
-                # Extract actual JSON error body from Resend API response
-                err_body = exc.read().decode("utf-8")
-                err_json = json.loads(err_body)
-                err_detail = err_json.get("message") or err_body
-            except Exception:
-                pass
-        logger.error(f"Resend API call failed for order {order_id}: {err_detail}")
-        err_lower = err_detail.lower()
-        test_mode_triggers = [
-            "testing emails to your own email address",
-            "testing email address",
-            "testing email",
-            "own email address",
-            "verify a domain",
-            "resend.com/domains",
-            "domains like",
-            "only send testing emails",
-        ]
+            # 2. If test-mode restriction, fall back to owner email
+            test_mode_triggers = [
+                "testing emails to your own email address",
+                "testing email address",
+                "own email address",
+                "verify a domain",
+                "resend.com/domains",
+                "only send testing emails",
+            ]
+            is_test_mode = any(t in err_str.lower() for t in test_mode_triggers)
 
-        if any(trigger in err_lower for trigger in test_mode_triggers):
-            owner_email = os.getenv("RESEND_DEFAULT_RECIPIENT", "rdxayushpandey00@gmail.com").strip()
-            if buyer_email.strip().lower() != owner_email.lower():
-                logger.info(f"Resend testing restriction triggered for '{buyer_email}'. Retrying delivery to verified account owner '{owner_email}'.")
-                retry_payload = dict(payload)
-                retry_payload["to"] = [owner_email]
+            if is_test_mode and buyer_email.strip().lower() != owner_email.lower():
+                logger.info(f"Resend test-mode: retrying to verified owner '{owner_email}' for order {order_id}.")
                 try:
-                    req_owner = urllib.request.Request(
-                        "https://api.resend.com/emails",
-                        data=json.dumps(retry_payload).encode("utf-8"),
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                            "User-Agent": "PlantDoctors-Backend/1.0",
-                        },
-                        method="POST",
-                    )
-                    with urllib.request.urlopen(req_owner) as resp_owner:
-                        resp_bytes_owner = resp_owner.read()
-                        data_owner = json.loads(resp_bytes_owner.decode("utf-8")) if resp_bytes_owner else {}
-                        resend_id_owner = data_owner.get("id", "resend_ok")
-                        logger.info(f"Fallback email delivered to owner ({owner_email}) for order {order_id}. Resend ID: {resend_id_owner}")
-                        return {
-                            "sent": True,
-                            "method": "resend_rest_owner_fallback",
-                            "resend_id": resend_id_owner,
-                            "recipient": owner_email,
-                            "note": f"Resend Free Tier test mode: Email sent to account owner ({owner_email}) instead of unverified recipient ({buyer_email}). Verify domain at resend.com/domains for custom recipients."
-                        }
+                    sdk_result_owner = _send_via_sdk(owner_email)
+                    logger.info(f"Fallback email delivered to owner ({owner_email}) for order {order_id}. Resend ID: {sdk_result_owner['id']}")
+                    return {
+                        "sent": True,
+                        "method": "resend_sdk_owner_fallback",
+                        "resend_id": sdk_result_owner["id"],
+                        "recipient": owner_email,
+                        "note": f"Resend Free Tier: Sent to account owner ({owner_email}) as domain not verified.",
+                    }
                 except Exception as owner_exc:
-                    logger.error(f"Fallback dispatch to owner failed: {owner_exc}")
+                    logger.error(f"Fallback SDK dispatch to owner failed: {owner_exc}")
+                    return {"sent": False, "error": f"Resend fallback error: {owner_exc}", "recipient": owner_email}
 
-        return {
-            "sent": False,
-            "error": f"Resend API Error: {err_detail}",
-            "recipient": buyer_email,
-        }
+            return {"sent": False, "error": f"Resend SDK Error: {err_str}", "recipient": buyer_email}
+
+    # 3. resend module not installed at all
+    logger.error(f"Resend SDK not available. Install it: pip install resend")
+    return {"sent": False, "error": "resend SDK not installed", "recipient": buyer_email}
