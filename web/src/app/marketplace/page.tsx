@@ -52,6 +52,8 @@ type OrderResult = {
   razorpay_key?: string;
   email_sent?: boolean;
   email_message?: string;
+  email_error?: string;
+  email_recipient?: string;
 };
 
 // ─── Category Icon Map ─────────────────────────────────────
@@ -79,10 +81,33 @@ export default function MarketplacePage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi_qr');
   const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [retryingEmail, setRetryingEmail] = useState(false);
   const [form, setForm] = useState<OrderForm>({
     buyer_name: '', buyer_phone: '', buyer_email: '',
     buyer_address: '', quantity: 1, rental_days: 1,
   });
+
+  const handleRetryEmail = async () => {
+    if (!orderResult?.order_id) return;
+    setRetryingEmail(true);
+    try {
+      const res = await fetchJson<{ success: boolean; email_sent: boolean; error?: string; message?: string }>(
+        `${getBackendBaseUrl()}/api/v1/store/orders/${orderResult.order_id}/send-confirmation`,
+        { method: 'POST' }
+      );
+      if (res?.success && res.email_sent) {
+        setOrderResult((prev) => prev ? { ...prev, email_sent: true, email_error: undefined } : prev);
+        if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+      } else {
+        alert(res?.error || 'Email dispatch failed. Please check RESEND_API_KEY configuration.');
+      }
+    } catch (err) {
+      console.error('Retry email error:', err);
+      alert('Failed to connect to backend for email retry.');
+    } finally {
+      setRetryingEmail(false);
+    }
+  };
 
   // EMI modal
   const [showEMI, setShowEMI] = useState<Product | null>(null);
@@ -839,24 +864,47 @@ export default function MarketplacePage() {
                       <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                            <Mail size={14} className="text-emerald-600" /> Gmail Confirmation
+                            <Mail size={14} className={orderResult.email_sent ? "text-emerald-600" : "text-amber-600"} /> Email Confirmation
                           </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Dispatched</span>
+                          {orderResult.email_sent ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Dispatched</span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Failed to send</span>
+                          )}
                         </div>
-                        <p className="text-xs text-slate-600 leading-normal">
-                          Receipt for <strong className="text-slate-900">{checkoutProduct.title} ({checkoutProduct.price})</strong> has been logged to <span className="text-emerald-700 font-bold">{form.buyer_email || 'your email'}</span>.
-                        </p>
-                        
-                        {/* Direct 1-Click Gmail Button */}
-                        <a
-                          href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(form.buyer_email || 'Plant Doctors')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 text-emerald-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
-                        >
-                          <Mail size={13} className="text-emerald-600" />
-                          <span>✉️ Click to Open Gmail Inbox</span>
-                        </a>
+
+                        {orderResult.email_sent ? (
+                          <>
+                            <p className="text-xs text-slate-600 leading-normal">
+                              Receipt for <strong className="text-slate-900">{checkoutProduct.title} ({checkoutProduct.price})</strong> has been dispatched to <span className="text-emerald-700 font-bold">{orderResult.email_recipient || form.buyer_email || 'your email'}</span> via Resend.
+                            </p>
+                            
+                            {/* Direct 1-Click Gmail Button */}
+                            <a
+                              href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(form.buyer_email || 'Plant Doctors')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 text-emerald-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                            >
+                              <Mail size={13} className="text-emerald-600" />
+                              <span>✉️ Click to Open Gmail Inbox</span>
+                            </a>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs text-amber-800 leading-normal">
+                              {orderResult.email_error || 'Email dispatch failed. Please verify RESEND_API_KEY setting.'}
+                            </p>
+                            <button
+                              onClick={handleRetryEmail}
+                              disabled={retryingEmail}
+                              className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+                            >
+                              {retryingEmail ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                              <span>Retry Sending Confirmation Email</span>
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       {/* WhatsApp updates */}

@@ -206,6 +206,8 @@ class OrderResponse(BaseModel):
     razorpay_key: Optional[str] = None
     email_sent: bool = False
     email_message: Optional[str] = None
+    email_error: Optional[str] = None
+    email_recipient: Optional[str] = None
 
 
 @router.post("/upload")
@@ -379,9 +381,12 @@ async def place_order(req: PlaceOrderRequest):
             payment_method=payment_method,
             payment_status=payment_status,
             buyer_address=req.buyer_address,
+            order_date=datetime.now(timezone.utc).strftime("%d %b %Y, %I:%M %p UTC"),
         )
         email_res["sent"] = email_dispatch.get("sent", False)
-        email_res["message"] = f"Confirmation email sent to {req.buyer_email.strip()}"
+        email_res["message"] = f"Confirmation email sent to {req.buyer_email.strip()}" if email_res["sent"] else (email_dispatch.get("error") or "Email dispatch failed")
+        email_res["error"] = email_dispatch.get("error")
+        email_res["recipient"] = email_dispatch.get("recipient", req.buyer_email.strip())
 
     return OrderResponse(
         success=True,
@@ -392,7 +397,61 @@ async def place_order(req: PlaceOrderRequest):
         razorpay_key=RAZORPAY_KEY,
         email_sent=email_res["sent"],
         email_message=email_res["message"],
+        email_error=email_res.get("error"),
+        email_recipient=email_res.get("recipient"),
     )
+
+
+@router.post("/orders/{order_id}/send-confirmation")
+async def retry_send_order_confirmation(order_id: str) -> Dict[str, Any]:
+    db = get_database()
+    order_doc = None
+    if db is not None:
+        try:
+            order_doc = await db["orders"].find_one({"order_id": order_id})
+        except Exception as exc:
+            logger.error("Failed to query order %s: %s", order_id, exc)
+
+    if not order_doc:
+        raise ValidationError(f"Order #{order_id} not found.")
+
+    buyer_email = order_doc.get("buyer_email")
+    if not buyer_email or "@" not in buyer_email:
+        raise ValidationError("No valid email address associated with this order.")
+
+    product_price = order_doc.get("product_price", "₹0")
+    quantity = int(order_doc.get("quantity", 1))
+    raw_num = re.sub(r"[^\d.]", "", str(product_price or "0"))
+    unit_price_float = float(raw_num) if raw_num else 0.0
+    total_price_formatted = f"₹{int(unit_price_float * quantity):,}" if unit_price_float > 0 else product_price
+
+    dispatch_res = send_order_confirmation_email(
+        buyer_email=buyer_email.strip(),
+        buyer_name=str(order_doc.get("buyer_name", "Valued Customer")).strip(),
+        order_id=order_id,
+        product_title=str(order_doc.get("product_title", "Kisan Bazaar Item")),
+        product_price=product_price,
+        quantity=quantity,
+        total_amount=total_price_formatted,
+        payment_method=str(order_doc.get("payment_method", "Paid")),
+        payment_status=str(order_doc.get("payment_status", "Successful")),
+        buyer_address=order_doc.get("buyer_address"),
+        order_date=str(order_doc.get("created_at", "")),
+    )
+
+    if dispatch_res.get("sent"):
+        return {
+            "success": True,
+            "message": f"Confirmation email successfully sent to {buyer_email}",
+            "email_sent": True,
+            "resend_id": dispatch_res.get("resend_id"),
+        }
+    else:
+        return {
+            "success": False,
+            "error": dispatch_res.get("error", "Failed to dispatch email via Resend"),
+            "email_sent": False,
+        }
 
 
 @router.get("/subscription/plans")
