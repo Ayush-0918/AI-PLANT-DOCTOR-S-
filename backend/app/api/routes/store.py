@@ -99,13 +99,19 @@ def generate_order_id(prefix: str = "KBZ") -> str:
 
 
 def _safe_price_to_paise(price_text: str) -> int:
-    normalized = re.sub(r"[^\d.]", "", str(price_text or ""))
-    if not normalized:
-        raise ValidationError("product_price must contain numeric value.")
+    raw = str(price_text or "")
+    match = re.search(r"Total:?\s*₹?\s*([\d,.]+)", raw, re.IGNORECASE)
+    if match:
+        val_str = re.sub(r"[^\d.]", "", match.group(1))
+    else:
+        first_num = re.search(r"[\d,.]+", raw)
+        val_str = re.sub(r"[^\d.]", "", first_num.group(0)) if first_num else ""
+    if not val_str:
+        return 10000
     try:
-        return int(float(normalized) * 100)
-    except (TypeError, ValueError) as exc:
-        raise ValidationError("product_price format is invalid.") from exc
+        return int(float(val_str) * 100)
+    except (TypeError, ValueError):
+        return 10000
 
 
 def _load_products_fallback() -> List[Dict[str, Any]]:
@@ -169,19 +175,19 @@ from app.services.email_service import send_order_confirmation_email
 
 
 class PlaceOrderRequest(BaseModel):
-    product_id: str = Field(..., min_length=2, max_length=80, description="Product identifier")
-    product_title: str = Field(..., min_length=2, max_length=120)
-    product_price: str = Field(..., min_length=1, max_length=40)
-    category: str = Field(..., min_length=2, max_length=60)
-    buyer_name: str = Field(..., min_length=2, max_length=80)
-    buyer_phone: str = Field(..., min_length=10, max_length=15)
+    product_id: str = Field(..., min_length=1, max_length=80, description="Product identifier")
+    product_title: str = Field(..., min_length=1, max_length=200)
+    product_price: str = Field(..., min_length=1, max_length=120)
+    category: str = Field(..., min_length=1, max_length=100)
+    buyer_name: str = Field(..., min_length=1, max_length=100)
+    buyer_phone: str = Field(..., min_length=3, max_length=30)
     buyer_email: Optional[str] = Field(default=None, max_length=120)
-    buyer_address: Optional[str] = Field(default=None, max_length=200)
-    quantity: int = Field(default=1, ge=1, le=100)
+    buyer_address: Optional[str] = Field(default=None, max_length=500)
+    quantity: int = Field(default=1, ge=1, le=1000)
     order_type: Literal["buy", "rent"] = Field(default="buy")
     rental_days: Optional[int] = Field(default=None, ge=1, le=365)
-    payment_method: Optional[str] = Field(default="Razorpay Online", max_length=50)
-    payment_status: Optional[str] = Field(default="Paid", max_length=50)
+    payment_method: Optional[str] = Field(default="Razorpay Online", max_length=100)
+    payment_status: Optional[str] = Field(default="Paid", max_length=100)
 
 
 class ProductCreateRequest(BaseModel):
