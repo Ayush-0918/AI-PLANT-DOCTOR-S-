@@ -4,7 +4,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult
+  getRedirectResult,
+  onAuthStateChanged
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -19,6 +20,7 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
+export { onAuthStateChanged };
 export const googleProvider = new GoogleAuthProvider();
 
 // Custom parameters to ensure clean Google OAuth account selection
@@ -45,10 +47,36 @@ export async function checkRedirectAuth() {
   } catch (err) {
     console.warn('Redirect auth result check:', err);
   }
+
+  if (auth.currentUser) {
+    const user = auth.currentUser;
+    return {
+      success: true,
+      user: {
+        name: user.displayName || 'Farmer',
+        email: user.email || '',
+        phone: user.phoneNumber || '',
+        uid: user.uid,
+        photoURL: user.photoURL || '',
+      }
+    };
+  }
+
   return null;
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(forceRedirect = false) {
+  const isEmbedded = typeof window !== 'undefined' && window.self !== window.top;
+
+  if (forceRedirect || isEmbedded) {
+    try {
+      await signInWithRedirect(auth, googleProvider);
+      return { success: false, redirecting: true, error: '' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Redirect auth failed' };
+    }
+  }
+
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
@@ -64,19 +92,16 @@ export async function signInWithGoogle() {
     };
   } catch (error: any) {
     console.warn('signInWithPopup error/blocked, attempting redirect fallback:', error?.code || error);
-    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
-      try {
-        await signInWithRedirect(auth, googleProvider);
-        return { success: false, redirecting: true, error: '' };
-      } catch (redirectErr: any) {
-        console.error('Redirect auth error:', redirectErr);
-        return { success: false, error: redirectErr?.message || 'Google sign-in failed' };
-      }
+    try {
+      await signInWithRedirect(auth, googleProvider);
+      return { success: false, redirecting: true, error: '' };
+    } catch (redirectErr: any) {
+      console.error('Redirect auth error:', redirectErr);
+      return {
+        success: false,
+        error: redirectErr?.message || 'Google sign-in failed'
+      };
     }
-    return {
-      success: false,
-      error: error.message || 'Google sign-in failed'
-    };
   }
 }
 

@@ -191,7 +191,7 @@ function getOB(language: string) {
   return OB[language] ?? OB['default'];
 }
 
-import { signInWithGoogle, checkRedirectAuth } from '@/lib/firebase';
+import { auth, onAuthStateChanged, signInWithGoogle, checkRedirectAuth } from '@/lib/firebase';
 
 /* ── Flow: splash → language → farmer → crops → voice → location → finish ── */
 const stepOrder = ['splash', 'language', 'farmer', 'crops', 'voice', 'location', 'finish'] as const;
@@ -213,8 +213,25 @@ export default function OnboardingFlow() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  // Check for Google OAuth redirect result on mount
+  // Check for Google OAuth redirect / auth state changes
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userName = user.displayName || 'किसान (Google User)';
+        setDraft((c) => ({ ...c, name: userName }));
+        if (user.email) setAuthEmail(user.email);
+        await syncUserToMongoDB({
+          name: userName,
+          email: user.email || '',
+          phone_number: user.phoneNumber || '',
+          auth_provider: 'google_firebase',
+          firebase_uid: user.uid
+        });
+        setAuthLoading(false);
+        setStep('crops');
+      }
+    });
+
     checkRedirectAuth().then(async (res) => {
       if (res && res.success && res.user) {
         const userName = res.user.name || 'किसान (Google User)';
@@ -227,9 +244,12 @@ export default function OnboardingFlow() {
           auth_provider: 'google_firebase',
           firebase_uid: res.user.uid
         });
+        setAuthLoading(false);
         setStep('crops');
       }
     });
+
+    return () => unsubscribe();
   }, []);
 
   // Derive localized strings based on currently selected language
