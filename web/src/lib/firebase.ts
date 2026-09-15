@@ -1,17 +1,41 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCC_Vp5W4RY8HXio39fHXBtul9i86ulSps",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "plant-doctors.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "plant-doctors",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "plant-doctors.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "786095852488",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:786095852488:web:efd33718dea854a4fa4efd",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-001FK862HH"
+  apiKey: "AIzaSyCC_Vp5W4RY8HXio39fHXBtul9i86ulSps",
+  authDomain: "plant-doctors.firebaseapp.com",
+  projectId: "plant-doctors",
+  storageBucket: "plant-doctors.firebasestorage.app",
+  messagingSenderId: "786095852488",
+  appId: "1:786095852488:web:efd33718dea854a4fa4efd",
+  measurementId: "G-001FK862HH"
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+export async function signInWithGoogle() {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+    return {
+      success: true,
+      user: {
+        name: user.displayName || 'Farmer',
+        email: user.email || '',
+        phone: user.phoneNumber || '',
+        uid: user.uid,
+        photoURL: user.photoURL || '',
+      }
+    };
+  } catch (error: any) {
+    console.error('Firebase Google Auth error:', error);
+    return {
+      success: false,
+      error: error.message || 'Google sign-in failed'
+    };
+  }
+}
+
 export default app;

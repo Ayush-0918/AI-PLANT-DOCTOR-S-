@@ -12,8 +12,6 @@ import { normalizeSoilType } from '@/lib/soil';
 
 export interface FarmerProfile {
   name: string;
-  email?: string;
-  phone?: string;
   village: string;
   state: string;
   locationLabel: string;
@@ -37,8 +35,6 @@ const STORAGE_KEY = 'plant-doctor/farmer-profile';
 
 const defaultProfile: FarmerProfile = {
   name: 'किशन कुमार',
-  email: 'kishan@plantdoctor.ai',
-  phone: '+91 9876543210',
   village: '',
   state: '',
   locationLabel: '',
