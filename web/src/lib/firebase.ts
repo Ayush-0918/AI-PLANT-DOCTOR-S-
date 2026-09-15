@@ -78,7 +78,12 @@ export async function signInWithGoogle(forceRedirect = false) {
   }
 
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const popupPromise = signInWithPopup(auth, googleProvider);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('popup_timeout')), 2000)
+    );
+
+    const result: any = await Promise.race([popupPromise, timeoutPromise]);
     const user = result.user;
     return {
       success: true,
@@ -91,7 +96,7 @@ export async function signInWithGoogle(forceRedirect = false) {
       }
     };
   } catch (error: any) {
-    console.warn('signInWithPopup error/blocked, attempting redirect fallback:', error?.code || error);
+    console.warn('signInWithPopup timed out or blocked, switching to signInWithRedirect:', error?.message || error);
     try {
       await signInWithRedirect(auth, googleProvider);
       return { success: false, redirecting: true, error: '' };

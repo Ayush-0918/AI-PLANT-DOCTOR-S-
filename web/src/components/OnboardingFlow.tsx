@@ -212,11 +212,13 @@ export default function OnboardingFlow() {
   const [authPhone, setAuthPhone] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [isAuthed, setIsAuthed] = useState(false);
 
   // Check for Google OAuth redirect / auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        setIsAuthed(true);
         const userName = user.displayName || 'किसान (Google User)';
         setDraft((c) => ({ ...c, name: userName }));
         if (user.email) setAuthEmail(user.email);
@@ -234,6 +236,7 @@ export default function OnboardingFlow() {
 
     checkRedirectAuth().then(async (res) => {
       if (res && res.success && res.user) {
+        setIsAuthed(true);
         const userName = res.user.name || 'किसान (Google User)';
         setDraft((c) => ({ ...c, name: userName }));
         if (res.user.email) setAuthEmail(res.user.email);
@@ -396,22 +399,24 @@ export default function OnboardingFlow() {
   };
 
   useEffect(() => {
-    if (step !== 'splash') return undefined;
+    if (step !== 'splash' || isAuthed) return undefined;
 
     const tick = window.setInterval(() => {
       setProgress((current) => (current >= 96 ? current : current + 11));
     }, 180);
 
     const timer = window.setTimeout(() => {
-      setStep('language');
-      setProgress(100);
+      if (!isAuthed) {
+        setStep('language');
+        setProgress(100);
+      }
     }, 1900);
 
     return () => {
       window.clearInterval(tick);
       window.clearTimeout(timer);
     };
-  }, [step]);
+  }, [step, isAuthed]);
 
   useEffect(() => {
     updateProfile({
