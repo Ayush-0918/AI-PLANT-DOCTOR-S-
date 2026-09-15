@@ -109,6 +109,11 @@ async def run_scan_inference(
     if escalation_required:
         escalation_reason = "low_confidence" if confidence_pct < settings.ai_confidence_threshold else "unknown_diagnosis"
 
+    if db is None:
+        from app.core.database import get_database, init_database
+        await init_database()
+        db = get_database()
+
     normalized_user_id = user_id or "anonymous"
     persisted = db is not None
     prediction_id = ""
@@ -141,13 +146,19 @@ async def run_scan_inference(
     }
 
     if db is not None:
-        await db["scans"].insert_one(scan_doc)
-        prediction_id = await log_prediction(db, prediction_doc)
-        await db["users"].update_one(
-            {"user_id": normalized_user_id},
-            {"$inc": {"total_scans": 1}, "$set": {"last_active_at": datetime.now(timezone.utc)}},
-            upsert=True,
-        )
+        try:
+            await db["scans"].insert_one(scan_doc)
+            prediction_id = await log_prediction(db, prediction_doc)
+            await db["users"].update_one(
+                {"user_id": normalized_user_id},
+                {"$inc": {"total_scans": 1}, "$set": {"last_active_at": datetime.now(timezone.utc)}},
+                upsert=True,
+            )
+            print(f"✅ REAL SCAN DOCUMENT PERSISTED TO MONGODB ATLAS! user_id={normalized_user_id}, disease={diagnosis}")
+        except Exception as insert_err:
+            print(f"❌ ERROR persisting scan doc to MongoDB Atlas: {insert_err}")
+    else:
+        print("❌ CRITICAL ERROR: Database instance is None! Scan document NOT persisted.")
 
     default_recommendation_action = (
         "Confidence low. Connect to human agronomist before spraying."

@@ -55,6 +55,25 @@ except ImportError:
 app = FastAPI(title="PlantDoctor AI Backend", version="4.0.0")
 register_error_handlers(app)
 
+@app.on_event("startup")
+async def startup_mongo_database():
+    try:
+        ok = await init_database()
+        if ok:
+            await ensure_database_indexes()
+            print("✅ MongoDB Atlas Database Connected and Indexes Verified.")
+        else:
+            print("⚠️ MongoDB Database connection failed at startup.")
+    except Exception as err:
+        print(f"❌ MongoDB Database startup error: {err}")
+
+@app.on_event("shutdown")
+async def shutdown_mongo_database():
+    try:
+        await close_database()
+    except Exception:
+        pass
+
 # Redis cache startup/shutdown events (optional)
 if cache_available:
     @app.on_event("startup")
