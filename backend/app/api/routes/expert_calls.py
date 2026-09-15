@@ -88,16 +88,24 @@ async def request_expert_call(
     user=Depends(get_optional_user),
 ) -> ExpertCallResponse:
     db = get_database()
+    user_id = user.get("user_id") if (user and isinstance(user, dict)) else None
+    meta = dict(request.metadata) if request.metadata else {}
+    if request.prediction_id:
+        meta["prediction_id"] = request.prediction_id
+
     response, call_log_id = await trigger_expert_call(
         db=db,
         phone_number=request.phone_number,
-        user_id=user.get("user_id") if user else None,
+        user_id=user_id,
         reason=request.reason,
-        metadata={**request.metadata, "prediction_id": request.prediction_id},
+        metadata=meta,
     )
     return ExpertCallResponse(
-        **response,
-        message="{} log_id={}".format(response["message"], call_log_id if call_log_id else "none"),
+        success=bool(response.get("success", True)),
+        call_id=response.get("call_id"),
+        status=str(response.get("status", "initiated")),
+        attempts=int(response.get("attempts", 1)),
+        message="{} log_id={}".format(response.get("message", "Call initiated"), call_log_id if call_log_id else "none"),
     )
 
 

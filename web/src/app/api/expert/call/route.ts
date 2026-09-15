@@ -39,16 +39,12 @@ export async function POST(req: NextRequest) {
 
       if (backendRes.ok) {
         const data = await backendRes.json();
-        return NextResponse.json(data);
-      }
-
-      const errData = await backendRes.json().catch(() => ({}));
-      const errMsg  = errData?.detail || errData?.message || `Backend error ${backendRes.status}`;
-      if (backendRes.status !== 503) {
-        return NextResponse.json({ success: false, message: errMsg }, { status: backendRes.status });
+        if (data && data.success) {
+          return NextResponse.json(data);
+        }
       }
     } catch {
-      // Backend down — fall through
+      // Backend error or timeout — fall through to direct provider fallback
     }
 
     // 2. Direct VAPI or Direct Twilio fallback
