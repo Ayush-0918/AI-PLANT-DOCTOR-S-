@@ -113,12 +113,20 @@ export default function WealthPredictor() {
             {t('intel_roi_profitability')}
           </h3>
           <div className="flex items-center gap-2.5 mt-0.5">
-            <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              +{stats.roi.toFixed(2)}%
+            <span className={`text-2xl font-black tracking-tight ${stats.roi >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'}`}>
+              {stats.roi >= 0 ? `+${stats.roi.toFixed(2)}%` : `${stats.roi.toFixed(2)}%`}
             </span>
-            <div className="flex h-6 items-center gap-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/80 px-2.5 py-0.5 border border-emerald-300/80 dark:border-emerald-800/80 text-[10px] font-black text-emerald-700 dark:text-emerald-300 shadow-sm">
-              <TrendingUp size={12} />
-              <span>{language === 'English' ? 'ESTIMATED' : 'अनुमानित'}</span>
+            <div className={`flex h-6 items-center gap-1 rounded-full px-2.5 py-0.5 border text-[10px] font-black shadow-sm ${
+              stats.roi >= 0 
+                ? 'bg-emerald-100/80 dark:bg-emerald-950/80 border-emerald-300/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300'
+                : 'bg-rose-100/80 dark:bg-rose-950/80 border-rose-300/80 dark:border-rose-800/80 text-rose-700 dark:text-rose-300'
+            }`}>
+              <TrendingUp size={12} className={stats.roi < 0 ? 'rotate-180' : ''} />
+              <span>
+                {stats.roi >= 0 
+                  ? (isHindi ? 'अनुमानित लाभ' : 'ESTIMATED PROFIT') 
+                  : (isHindi ? 'अनुमानित घाटा' : 'ATTENTION NEEDED')}
+              </span>
             </div>
           </div>
         </div>
@@ -164,15 +172,19 @@ export default function WealthPredictor() {
           </p>
         </div>
 
-        {/* Net Profit Card — Replaced heavy dark solid box with Soft Glass Prism Gradient */}
-        <div className="rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 text-white p-4.5 shadow-lg shadow-emerald-600/20 relative overflow-hidden border border-emerald-500/30">
+        {/* Net Profit Card */}
+        <div className={`rounded-2xl text-white p-4.5 shadow-lg relative overflow-hidden border ${
+          stats.profit >= 0
+            ? 'bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 shadow-emerald-600/20 border-emerald-500/30'
+            : 'bg-gradient-to-r from-rose-600 via-red-600 to-amber-700 shadow-rose-600/20 border-rose-500/30'
+        }`}>
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/5" />
           <div className="relative z-10 flex justify-between items-center">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-100/90">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-white/90">
               {t('intel_net_profit')}
             </span>
             <span className="text-2xl font-black text-white tracking-tight">
-              ₹{stats.profit.toLocaleString('en-IN')}
+              {stats.profit >= 0 ? `₹${stats.profit.toLocaleString('en-IN')}` : `-₹${Math.abs(stats.profit).toLocaleString('en-IN')}`}
             </span>
           </div>
           <div className="relative z-10 mt-2.5 flex items-center gap-2">
