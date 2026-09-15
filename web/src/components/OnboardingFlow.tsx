@@ -17,8 +17,16 @@ import {
   Stars,
   Tractor,
   Volume2,
+  User,
+  Lock,
+  Sparkles,
+  ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
+import { getBackendBaseUrl } from '@/lib/api';
 import AppLogo from '@/components/AppLogo';
 import { useLanguage } from '@/context/LanguageContext';
 import { useFarmerProfile } from '@/context/FarmerProfileContext';
@@ -191,8 +199,8 @@ function getOB(language: string) {
   return OB[language] ?? OB['default'];
 }
 
-/* ── Flow: splash → language → intro → farmer → crops → voice → location → finish ── */
-const stepOrder = ['splash', 'language', 'intro', 'farmer', 'crops', 'voice', 'location', 'finish'] as const;
+/* ── Flow: splash → language → auth → intro → farmer → crops → voice → location → finish ── */
+const stepOrder = ['splash', 'language', 'auth', 'intro', 'farmer', 'crops', 'voice', 'location', 'finish'] as const;
 type OnboardingStep = (typeof stepOrder)[number];
 
 export default function OnboardingFlow() {
@@ -204,6 +212,16 @@ export default function OnboardingFlow() {
   const [showHelp, setShowHelp] = useState(false);
   const [isSpeakingPreview, setIsSpeakingPreview] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+
+  // Authentication State
+  const [authDraft, setAuthDraft] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   // Derive localized strings based on currently selected language
   const S = useMemo(() => getOB(language), [language]);
@@ -239,6 +257,127 @@ export default function OnboardingFlow() {
     latitude: profile.latitude,
     longitude: profile.longitude,
   });
+
+  const syncUserToMongoDB = async (userData: {
+    firebase_uid?: string;
+    name?: string;
+    email?: string;
+    phone_number?: string;
+    auth_provider?: string;
+    photo_url?: string;
+  }) => {
+    try {
+      const backendUrl = getBackendBaseUrl();
+      const res = await fetch(`${backendUrl}/api/v1/auth/sync-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...userData,
+          language: language || 'English',
+          village: draft.village || '',
+          state: draft.state || '',
+          farmer_type: draft.farmerType || '',
+          farm_size: draft.farmSize || '',
+          crops: draft.crops || [],
+        }),
+      });
+      return await res.json();
+    } catch (err) {
+      console.warn('MongoDB User Sync Notice:', err);
+      return null;
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setIsAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      const user = res.user;
+      const name = user.displayName || 'Google Farmer';
+      const email = user.email || '';
+      const phone = user.phoneNumber || '';
+
+      setDraft((c) => ({ ...c, name: c.name || name }));
+      setAuthDraft({ name, email, phone, password: '' });
+      updateProfile({ name, email, phone });
+
+      await syncUserToMongoDB({
+        firebase_uid: user.uid,
+        name,
+        email,
+        phone_number: phone,
+        auth_provider: 'google',
+        photo_url: user.photoURL || undefined,
+      });
+
+      nextStep();
+    } catch (err: any) {
+      console.error('Google Sign-In Error:', err);
+      setAuthError(err.message || 'Google Sign-in popup was closed. Use direct entry below.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleCustomAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authDraft.name.trim() && !authDraft.phone.trim() && !authDraft.email.trim()) {
+      setAuthError('कृपया अपना नाम या मोबाइल नंबर दर्ज करें।');
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError('');
+    try {
+      const name = authDraft.name.trim() || 'Kishan Kumar';
+      const email = authDraft.email.trim() || 'kishan@plantdoctor.ai';
+      const phone = authDraft.phone.trim() || '+91 8228858145';
+
+      setDraft((c) => ({ ...c, name }));
+      updateProfile({ name, email, phone });
+
+      await syncUserToMongoDB({
+        name,
+        email,
+        phone_number: phone,
+        auth_provider: 'custom',
+      });
+
+      nextStep();
+    } catch (err: any) {
+      console.warn('Auth save warning:', err);
+      nextStep();
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleQuickDemoAuth = async () => {
+    setIsAuthLoading(true);
+    setAuthError('');
+    try {
+      const name = 'ईशान / Kishan Kumar';
+      const email = 'kishan@plantdoctor.ai';
+      const phone = '+91 8228858145';
+
+      setAuthDraft({ name, email, phone, password: 'demo' });
+      setDraft((c) => ({ ...c, name: 'Kishan Kumar' }));
+      updateProfile({ name: 'Kishan Kumar', email, phone });
+
+      await syncUserToMongoDB({
+        name: 'Kishan Kumar',
+        email,
+        phone_number: phone,
+        auth_provider: 'demo',
+      });
+
+      nextStep();
+    } catch (err) {
+      nextStep();
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (step !== 'splash') return undefined;
@@ -580,6 +719,145 @@ export default function OnboardingFlow() {
                   <p className="mt-4 text-center text-xs text-slate-500 mb-2">
                     I read and accept the <a href="#" className="text-blue-600 font-medium">{S.terms}</a> and the <a href="#" className="text-blue-600 font-medium">{S.privacy}</a>.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* ────── AUTHENTICATION (FIREBASE & MONGODB SYNC) ────── */}
+            {step === 'auth' && (
+              <div className="flex h-full flex-col px-6 pb-6 pt-6 bg-white overflow-y-auto hide-scrollbar">
+                <StepHeader onBack={previousStep} onHelp={() => setShowHelp(true)} />
+
+                <div className="mb-4 shrink-0 text-center">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-2">
+                    <User size={24} />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900">किसान पहचान / Authentication</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    अपना नाम, ईमेल और नंबर दर्ज करें ताकि आपकी जानकारी MongoDB में सुरक्षित रहे।
+                  </p>
+                </div>
+
+                {authError && (
+                  <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600 font-medium text-center">
+                    {authError}
+                  </div>
+                )}
+
+                {/* Continue with Google Button */}
+                <button
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  disabled={isAuthLoading}
+                  className="w-full flex items-center justify-center gap-3 rounded-2xl border border-slate-300 bg-white px-5 py-3.5 font-semibold text-slate-700 hover:bg-slate-50 active:scale-98 transition-all shadow-sm mb-4"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Continue with Google</span>
+                </button>
+
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="border-t border-slate-200 w-full" />
+                  <span className="bg-white px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider absolute">
+                    या विवरण भरें
+                  </span>
+                </div>
+
+                {/* Direct Entry Form */}
+                <form onSubmit={handleCustomAuth} className="space-y-3 mt-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">
+                      किसान का नाम / Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={authDraft.name}
+                        onChange={(e) => setAuthDraft((c) => ({ ...c, name: e.target.value }))}
+                        placeholder="ईशान / Kishan Kumar"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">
+                      ईमेल / Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+                      <input
+                        type="email"
+                        value={authDraft.email}
+                        onChange={(e) => setAuthDraft((c) => ({ ...c, email: e.target.value }))}
+                        placeholder="kishan@plantdoctor.ai"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">
+                      मोबाइल नंबर / Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <PhoneCall className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+                      <input
+                        type="tel"
+                        required
+                        value={authDraft.phone}
+                        onChange={(e) => setAuthDraft((c) => ({ ...c, phone: e.target.value }))}
+                        placeholder="+91 8228858145"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isAuthLoading}
+                    className="w-full rounded-2xl bg-blue-600 px-5 py-3.5 font-bold text-white hover:bg-blue-700 active:scale-95 transition-transform text-sm shadow-md mt-2 flex items-center justify-center gap-2"
+                  >
+                    {isAuthLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Saving to MongoDB...</span>
+                      </>
+                    ) : (
+                      <span>आगे बढ़ें / Save & Continue</span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Quick 1-Click Demo Login */}
+                <div className="mt-4 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleQuickDemoAuth}
+                    disabled={isAuthLoading}
+                    className="w-full rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs font-bold text-amber-900 hover:bg-amber-100 active:scale-98 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Sparkles size={14} className="text-amber-600" />
+                    <span>⚡ 1-Click Quick Demo (ईशान / Kishan Kumar)</span>
+                  </button>
                 </div>
               </div>
             )}
