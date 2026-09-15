@@ -193,8 +193,8 @@ function getOB(language: string) {
 
 import { signInWithGoogle } from '@/lib/firebase';
 
-/* ── Flow: splash → language → intro → auth → farmer → crops → voice → location → finish ── */
-const stepOrder = ['splash', 'language', 'intro', 'auth', 'farmer', 'crops', 'voice', 'location', 'finish'] as const;
+/* ── Flow: splash → language → farmer → crops → voice → location → finish ── */
+const stepOrder = ['splash', 'language', 'farmer', 'crops', 'voice', 'location', 'finish'] as const;
 type OnboardingStep = (typeof stepOrder)[number];
 
 export default function OnboardingFlow() {
@@ -209,7 +209,6 @@ export default function OnboardingFlow() {
 
   // Auth state
   const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
   const [authPhone, setAuthPhone] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -234,11 +233,11 @@ export default function OnboardingFlow() {
   ];
 
   const [draft, setDraft] = useState({
-    name: profile.name || 'इशान',
-    village: profile.village,
-    state: profile.state,
-    farmerType: profile.farmerType,
-    farmSize: profile.farmSize,
+    name: profile.name || 'किशन कुमार',
+    village: profile.village || 'लुधियाना',
+    state: profile.state || 'पंजाब',
+    farmerType: profile.farmerType || S.ft1,
+    farmSize: profile.farmSize || '3.5 acres',
     crops: profile.crops,
     voiceEnabled: profile.voiceEnabled,
     locationAllowed: profile.locationAllowed,
@@ -249,17 +248,36 @@ export default function OnboardingFlow() {
     longitude: profile.longitude,
   });
 
-  const syncUserToMongoDB = async (userData: { name: string; email?: string; phone_number?: string; auth_provider?: string; firebase_uid?: string }) => {
+  const syncUserToMongoDB = async (userData: {
+    name: string;
+    email?: string;
+    phone_number?: string;
+    auth_provider?: string;
+    firebase_uid?: string;
+    village?: string;
+    state?: string;
+    farm_size?: string;
+    farmer_type?: string;
+  }) => {
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       await fetch(`${API_BASE}/api/v1/auth/sync-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...userData,
-          language: language || 'Hindi'
+          name: userData.name,
+          email: userData.email || authEmail || '',
+          phone_number: userData.phone_number || authPhone || '',
+          auth_provider: userData.auth_provider || 'farmer_form',
+          firebase_uid: userData.firebase_uid || '',
+          language: language || 'Hindi',
+          village: userData.village || draft.village || '',
+          state: userData.state || draft.state || '',
+          farm_size: userData.farm_size || draft.farmSize || '',
+          farmer_type: userData.farmer_type || draft.farmerType || '',
         })
       });
+      console.log('✅ User authenticated & synced to MongoDB Atlas!');
     } catch (err) {
       console.warn('Sync to MongoDB failed:', err);
     }
@@ -270,16 +288,18 @@ export default function OnboardingFlow() {
     setAuthError('');
     const res = await signInWithGoogle();
     if (res.success && res.user) {
-      setDraft((c) => ({ ...c, name: res.user.name }));
+      const userName = res.user.name || 'किसान (Google User)';
+      setDraft((c) => ({ ...c, name: userName }));
+      if (res.user.email) setAuthEmail(res.user.email);
       await syncUserToMongoDB({
-        name: res.user.name,
+        name: userName,
         email: res.user.email,
         phone_number: res.user.phone,
         auth_provider: 'google_firebase',
         firebase_uid: res.user.uid
       });
       setAuthLoading(false);
-      setStep('farmer');
+      setStep('crops');
     } else {
       setAuthLoading(false);
       setAuthError(res.error || 'Google Sign-In failed');
@@ -288,35 +308,50 @@ export default function OnboardingFlow() {
 
   const handleDemoFarmerSignIn = async () => {
     setAuthLoading(true);
-    const demoName = 'Ishan Demo User';
+    const demoName = 'इशान (Kishan Kumar)';
     const demoEmail = 'ishan@plantdoctor.ai';
     const demoPhone = '9876543210';
-    setDraft((c) => ({ ...c, name: demoName }));
+    setDraft((c) => ({
+      ...c,
+      name: demoName,
+      village: 'लुधियाना',
+      state: 'पंजाब',
+      farmSize: '3.5 acres'
+    }));
     await syncUserToMongoDB({
       name: demoName,
       email: demoEmail,
       phone_number: demoPhone,
-      auth_provider: 'demo'
+      auth_provider: 'demo_1click',
+      village: 'लुधियाना',
+      state: 'पंजाब',
+      farm_size: '3.5 acres',
+      farmer_type: S.ft1
     });
     setAuthLoading(false);
-    setStep('farmer');
+    setStep('crops');
   };
 
-  const handleManualAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFarmerSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!draft.name.trim()) {
-      setAuthError('Kripya apna naam bharein (Please enter your name)');
+      setAuthError('कृपया अपना नाम दर्ज करें (Please enter your name)');
       return;
     }
     setAuthLoading(true);
+    setAuthError('');
     await syncUserToMongoDB({
       name: draft.name.trim(),
       email: authEmail.trim(),
       phone_number: authPhone.trim(),
-      auth_provider: 'email_form'
+      auth_provider: authEmail || authPhone ? 'contact_form' : 'basic_form',
+      village: draft.village,
+      state: draft.state,
+      farm_size: draft.farmSize,
+      farmer_type: draft.farmerType
     });
     setAuthLoading(false);
-    setStep('farmer');
+    setStep('crops');
   };
 
   useEffect(() => {
@@ -363,7 +398,6 @@ export default function OnboardingFlow() {
     };
   }, []);
 
-  const currentSlide = introSlides[introIndex];
   const currentLanguage = useMemo(() => getLanguageMeta(language), [language]);
 
   const nextStep = () => {
@@ -376,24 +410,9 @@ export default function OnboardingFlow() {
     if (navigator.vibrate) navigator.vibrate(10);
     const currentIndex = stepOrder.indexOf(step);
     const prev = stepOrder[currentIndex - 1];
-    if (prev === 'intro') {
-      setIntroIndex(introSlides.length - 1);
-      setStep('intro');
-    } else if (prev) {
+    if (prev) {
       setStep(prev);
     }
-  };
-
-  const previousIntro = () => {
-    setIntroIndex((current) => (current === 0 ? introSlides.length - 1 : current - 1));
-  };
-
-  const nextIntro = () => {
-    if (introIndex === introSlides.length - 1) {
-      setStep('farmer');
-      return;
-    }
-    setIntroIndex((current) => current + 1);
   };
 
   const toggleCrop = (crop: string) => {
@@ -663,248 +682,171 @@ export default function OnboardingFlow() {
               </div>
             )}
 
-            {/* ────── INTRO SLIDES ────── */}
-            {step === 'intro' && (
-              <div className="flex h-full flex-col px-6 pb-6 pt-10">
-                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                  <div className="mb-8 p-6 bg-blue-50 rounded-[2rem] text-blue-600">
-                    <currentSlide.icon size={48} strokeWidth={2} />
-                  </div>
-                  <h2 className="text-3xl font-bold text-slate-900 leading-tight">
-                    {currentSlide.title}
-                  </h2>
-                  <p className="mt-4 text-lg text-slate-600">
-                    {currentSlide.description}
-                  </p>
-                </div>
-
-                <div className="flex justify-center gap-2 mb-10">
-                  {introSlides.map((slide, index) => (
-                    <button
-                      key={slide.title}
-                      onClick={() => setIntroIndex(index)}
-                      className={`h-2 rounded-full transition-all ${
-                        introIndex === index ? 'w-8 bg-blue-600' : 'w-2 bg-slate-200'
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 shrink-0">
-                  <button
-                    onClick={previousIntro}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 font-bold text-slate-600"
-                  >
-                    {S.continueBtn === 'Continue' ? 'Back' : S.continueBtn.replace('Continue', 'Back')}
-                  </button>
-                  <button
-                    onClick={nextIntro}
-                    className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white hover:bg-blue-700 active:scale-95 transition-transform"
-                  >
-                    {introIndex === introSlides.length - 1 ? S.saveContinue.split(' ')[0] || 'Start' : S.continueBtn}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ────── AUTHENTICATION & FARMER REGISTRATION ────── */}
-            {step === 'auth' && (
-              <div className="flex h-full flex-col px-6 pb-6 pt-6">
+            {/* ────── UNIFIED FARMER AUTHENTICATION & PROFILE (STEP 2) ────── */}
+            {step === 'farmer' && (
+              <div className="flex h-full flex-col px-5 pb-5 pt-5 bg-gradient-to-b from-emerald-50/40 via-white to-slate-50/50">
                 <StepHeader onBack={previousStep} onHelp={() => setShowHelp(true)} />
-                <div className="mb-4 shrink-0">
-                  <h2 className="text-3xl font-bold text-slate-900">
-                    {language === 'हिंदी' ? 'किसान खाता और साइन-इन' : 'Farmer Sign-In & Profile'}
+                <div className="mb-3 shrink-0">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 text-emerald-800 text-xs font-bold mb-1">
+                    <Leaf size={14} />
+                    <span>{language === 'हिंदी' ? 'किसान प्रमाणीकरण (Access Step 2)' : 'Farmer Authentication'}</span>
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                    {language === 'हिंदी' ? 'किसान खाता व ऑनबोर्डिंग' : 'Farmer Sign-In & Profile'}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {language === 'हिंदी' 
-                      ? 'अपनी पहचान दर्ज करें या Google / Demo User से 1-क्लिक में लॉग इन करें' 
-                      : 'Enter your credentials or login instantly with Google / Demo User'}
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    {language === 'हिंदी'
+                      ? 'लॉग इन करें या अपनी जानकारी दें ताकि असली किसान ही ऐप उपयोग कर सकें'
+                      : 'Authenticate to access personalized plant doctor AI advice.'}
                   </p>
                 </div>
 
-                <div className="flex-1 overflow-y-auto hide-scrollbar space-y-4 pb-4">
-                  {/* Google Firebase Sign In */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    disabled={authLoading}
-                    className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-bold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-98 transition-all"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                    </svg>
-                    <span>{language === 'हिंदी' ? 'Google से लॉग इन करें (Firebase)' : 'Continue with Google'}</span>
-                  </button>
-
-                  {/* Demo Farmer Quick Login */}
-                  <button
-                    type="button"
-                    onClick={handleDemoFarmerSignIn}
-                    disabled={authLoading}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3.5 font-bold text-white shadow-md shadow-emerald-500/20 active:scale-98 transition-all"
-                  >
-                    <Stars size={18} />
-                    <span>{language === 'हिंदी' ? '⚡ इशान (Demo User) से तुरंत प्रवेश करें' : '⚡ Enter as Ishan (Demo Farmer)'}</span>
-                  </button>
-
-                  <div className="relative flex items-center justify-center my-3">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-                    <span className="relative bg-white px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {language === 'हिंदी' ? 'या फॉर्म भरें' : 'OR FILL DETAILS'}
-                    </span>
-                  </div>
-
+                <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3.5 pb-2">
                   {authError && (
-                    <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-medium text-rose-600 text-center">
+                    <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-600 text-center animate-shake">
                       {authError}
                     </div>
                   )}
 
-                  <form onSubmit={handleManualAuthSubmit} className="space-y-3">
+                  {/* ── Quick Auth Section ── */}
+                  <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-sm space-y-2.5">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider text-center">
+                      {language === 'हिंदी' ? 'तुरंत प्रमाणीकरण चुनें (Quick Auth)' : 'Choose Sign-In Method'}
+                    </p>
+
+                    {/* Google Sign-In */}
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      disabled={authLoading}
+                      className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-98 transition-all text-sm"
+                    >
+                      <svg className="h-5 w-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                      <span>{language === 'हिंदी' ? 'Continue with Google (गूगल लॉगिन)' : 'Continue with Google'}</span>
+                    </button>
+
+                    {/* 1-Click Demo Login */}
+                    <button
+                      type="button"
+                      onClick={handleDemoFarmerSignIn}
+                      disabled={authLoading}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-98 transition-all text-sm"
+                    >
+                      <Stars size={16} />
+                      <span>{language === 'हिंदी' ? '⚡ 1-Click Quick Demo Login (इशान)' : '⚡ 1-Click Demo Login (Ishan)'}</span>
+                    </button>
+                  </div>
+
+                  <div className="relative flex items-center justify-center py-1">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+                    <span className="relative bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {language === 'हिंदी' ? 'या किसान विवरण दर्ज करें' : 'OR ENTER FARMER DETAILS'}
+                    </span>
+                  </div>
+
+                  {/* ── Farmer Details Form ── */}
+                  <form onSubmit={handleFarmerSubmit} className="space-y-3">
                     <div>
-                      <label className="text-xs font-bold text-slate-700 mb-1 block">
-                        {language === 'हिंदी' ? 'आपका नाम (Farmer Name)' : 'Full Name'} *
-                      </label>
+                      <label className="text-xs font-bold text-slate-700 mb-1 block">{S.nameLabel} *</label>
                       <input
                         required
                         value={draft.name}
                         onChange={(e) => setDraft((c) => ({ ...c, name: e.target.value }))}
-                        placeholder="e.g. Ishan Demo User"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
+                        placeholder="e.g. किशन कुमार / Kishan Kumar"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none transition-all"
                       />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-700 mb-1 block">
-                        {language === 'हिंदी' ? 'ईमेल (Email Address)' : 'Email Address'}
+                        {language === 'हिंदी' ? 'मोबाइल नंबर या ईमेल (Mobile / Email)' : 'Phone Number or Email'}
                       </label>
                       <input
-                        type="email"
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        placeholder="ishan@plantdoctor.ai"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
+                        value={authPhone || authEmail}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.includes('@')) {
+                            setAuthEmail(val);
+                            setAuthPhone('');
+                          } else {
+                            setAuthPhone(val);
+                            setAuthEmail('');
+                          }
+                        }}
+                        placeholder="e.g. 9876543210 / farmer@gmail.com"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none transition-all"
                       />
                     </div>
 
-                    <div>
-                      <label className="text-xs font-bold text-slate-700 mb-1 block">
-                        {language === 'हिंदी' ? 'मोबाइल नंबर (Phone Number)' : 'Mobile Number'}
-                      </label>
-                      <input
-                        type="tel"
-                        value={authPhone}
-                        onChange={(e) => setAuthPhone(e.target.value)}
-                        placeholder="9876543210"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
-                      />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 mb-1 block">{S.villageLabel}</label>
+                        <input
+                          value={draft.village}
+                          onChange={(e) => setDraft((c) => ({ ...c, village: e.target.value }))}
+                          placeholder="e.g. लुधियाना"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 mb-1 block">{S.stateLabel}</label>
+                        <input
+                          value={draft.state}
+                          onChange={(e) => setDraft((c) => ({ ...c, state: e.target.value }))}
+                          placeholder="e.g. पंजाब"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none transition-all"
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-700 mb-1 block">
-                        {language === 'हिंदी' ? 'पासवर्ड (Password)' : 'Password'}
-                      </label>
+                      <label className="text-xs font-bold text-slate-700 mb-1 block">{S.farmSizeLabel}</label>
                       <input
-                        type="password"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
+                        value={draft.farmSize}
+                        onChange={(e) => setDraft((c) => ({ ...c, farmSize: e.target.value }))}
+                        placeholder="e.g. 3.5 acres"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none transition-all"
                       />
+                    </div>
+
+                    <div className="pt-1 space-y-2">
+                      {farmerTypes.map((entry) => {
+                        const active = draft.farmerType === entry;
+                        return (
+                          <button
+                            type="button"
+                            key={entry}
+                            onClick={() => setDraft((c) => ({ ...c, farmerType: entry }))}
+                            className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left transition-all text-xs font-semibold ${
+                              active
+                                ? 'border-emerald-500 bg-emerald-50/60 text-emerald-900 shadow-xs'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>{entry}</span>
+                            <div className={`h-4 w-4 rounded-full border-2 ${active ? 'border-[5px] border-emerald-600 bg-white' : 'border-slate-300'}`} />
+                          </button>
+                        );
+                      })}
                     </div>
 
                     <button
                       type="submit"
                       disabled={authLoading}
-                      className="w-full rounded-2xl bg-blue-600 px-5 py-3.5 font-bold text-white hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 mt-2"
+                      className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3.5 font-extrabold text-white hover:from-blue-700 hover:to-indigo-700 active:scale-98 transition-all shadow-md shadow-blue-600/20 mt-2 text-sm flex items-center justify-center gap-2"
                     >
-                      {authLoading ? (language === 'हिंदी' ? 'सेव हो रहा है...' : 'Saving to MongoDB...') : (language === 'हिंदी' ? 'सेव करें और जारी रखें ➔' : 'Save & Continue ➔')}
+                      {authLoading ? (
+                        <span>{language === 'हिंदी' ? 'प्रमाणीकृत हो रहा है...' : 'Authenticating...'}</span>
+                      ) : (
+                        <span>{language === 'हिंदी' ? 'प्रमाणित करें और आगे बढ़ें ➔' : 'Save & Authenticate ➔'}</span>
+                      )}
                     </button>
                   </form>
-                </div>
-              </div>
-            )}
-
-            {/* ────── FARMER PROFILE ────── */}
-            {step === 'farmer' && (
-              <div className="flex h-full flex-col px-6 pb-6 pt-6">
-                <StepHeader onBack={previousStep} onHelp={() => setShowHelp(true)} />
-                <div className="mb-4 shrink-0">
-                  <h2 className="text-3xl font-bold text-slate-900">{S.farmerTitle}</h2>
-                  <p className="mt-2 text-slate-600">{S.farmerSub}</p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto hide-scrollbar space-y-4 pb-4">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 mb-1.5 block">{S.nameLabel}</label>
-                    <input
-                      value={draft.name}
-                      onChange={(e) => setDraft((c) => ({ ...c, name: e.target.value }))}
-                      placeholder="e.g. Kishan Kumar"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 focus:border-blue-600 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 mb-1.5 block">{S.villageLabel}</label>
-                      <input
-                        value={draft.village}
-                        onChange={(e) => setDraft((c) => ({ ...c, village: e.target.value }))}
-                        placeholder="e.g. Ludhiana / Karnal"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 mb-1.5 block">{S.stateLabel}</label>
-                      <input
-                        value={draft.state}
-                        onChange={(e) => setDraft((c) => ({ ...c, state: e.target.value }))}
-                        placeholder="e.g. Punjab / Haryana"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 mb-1.5 block">{S.farmSizeLabel}</label>
-                    <input
-                      value={draft.farmSize}
-                      onChange={(e) => setDraft((c) => ({ ...c, farmSize: e.target.value }))}
-                      placeholder="3.5 acres"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 focus:border-blue-600 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="pt-2 space-y-2.5">
-                    {farmerTypes.map((entry) => {
-                      const active = draft.farmerType === entry;
-                      return (
-                        <button
-                          key={entry}
-                          onClick={() => setDraft((c) => ({ ...c, farmerType: entry }))}
-                          className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-colors ${
-                            active ? 'border-blue-600 bg-blue-50/50 text-blue-900' : 'border-slate-200 bg-white text-slate-700'
-                          }`}
-                        >
-                          <span className="font-semibold">{entry}</span>
-                          <div className={`h-5 w-5 rounded-full border-2 ${active ? 'border-[6px] border-blue-600 bg-white' : 'border-slate-300'}`} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="shrink-0 pt-4 bg-white">
-                  <button
-                    onClick={nextStep}
-                    className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-bold text-white hover:bg-blue-700 active:scale-95 transition-transform"
-                  >
-                    {S.saveContinue}
-                  </button>
                 </div>
               </div>
             )}

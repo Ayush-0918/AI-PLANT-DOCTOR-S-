@@ -56,6 +56,10 @@ class SyncUserRequest(BaseModel):
     auth_provider: Optional[str] = Field(default="email", max_length=50)
     firebase_uid: Optional[str] = Field(default="", max_length=120)
     language: Optional[str] = Field(default="Hindi", max_length=50)
+    village: Optional[str] = Field(default="", max_length=100)
+    state: Optional[str] = Field(default="", max_length=100)
+    farm_size: Optional[str] = Field(default="", max_length=50)
+    farmer_type: Optional[str] = Field(default="", max_length=100)
     location: Optional[Dict[str, Any]] = None
 
 @router.post("/sync-user")
@@ -74,6 +78,10 @@ async def sync_user(request: SyncUserRequest):
         "phone_number": request.phone_number,
         "auth_provider": request.auth_provider,
         "language": request.language,
+        "village": request.village,
+        "state": request.state,
+        "farm_size": request.farm_size,
+        "farmer_type": request.farmer_type,
         "location": request.location,
         "last_active_at": datetime.now(timezone.utc),
     }
@@ -87,7 +95,7 @@ async def sync_user(request: SyncUserRequest):
             },
             upsert=True
         )
-        print(f"✅ USER PROFILE SYNCED TO MONGODB ATLAS: name={request.name}, email={request.email}, provider={request.auth_provider}")
+        print(f"✅ USER PROFILE SYNCED TO MONGODB ATLAS: name={request.name}, email={request.email}, village={request.village}, provider={request.auth_provider}")
         return {"success": True, "message": "User profile synced to MongoDB Atlas", "user": user_doc}
 
     return {"success": False, "message": "Database instance uninitialized"}
