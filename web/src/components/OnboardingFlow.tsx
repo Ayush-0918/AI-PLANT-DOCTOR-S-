@@ -302,7 +302,9 @@ export default function OnboardingFlow() {
       setStep('crops');
     } else {
       setAuthLoading(false);
-      setAuthError(res.error || 'Google Sign-In failed');
+      if (res.error) {
+        setAuthError(res.error);
+      }
     }
   };
 

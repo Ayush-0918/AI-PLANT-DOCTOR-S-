@@ -30,6 +30,14 @@ export async function signInWithGoogle() {
       }
     };
   } catch (error: any) {
+    if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+      console.warn('Google Sign-In popup closed by user.');
+      return {
+        success: false,
+        closedByUser: true,
+        error: ''
+      };
+    }
     console.error('Firebase Google Auth error:', error);
     return {
       success: false,
