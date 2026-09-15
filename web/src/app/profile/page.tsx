@@ -191,6 +191,7 @@ export default function ProfilePage() {
 
   return (
     <div
+      suppressHydrationWarning
       className="min-h-full text-slate-900 dark:text-white pb-6 sm:pb-8 px-4 pt-4 space-y-4 relative overflow-hidden"
       style={{
         background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16,185,129,0.12), transparent 60%), radial-gradient(circle at 90% 40%, rgba(253,186,116,0.08), transparent 50%), linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
@@ -250,7 +251,7 @@ export default function ProfilePage() {
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.25em] text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span suppressHydrationWarning className="text-[9px] font-black uppercase tracking-[0.25em] text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                   {t('prof_heading')}
                 </span>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
