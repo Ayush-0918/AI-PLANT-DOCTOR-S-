@@ -191,7 +191,7 @@ function getOB(language: string) {
   return OB[language] ?? OB['default'];
 }
 
-import { signInWithGoogle } from '@/lib/firebase';
+import { signInWithGoogle, checkRedirectAuth } from '@/lib/firebase';
 
 /* ── Flow: splash → language → farmer → crops → voice → location → finish ── */
 const stepOrder = ['splash', 'language', 'farmer', 'crops', 'voice', 'location', 'finish'] as const;
@@ -212,6 +212,25 @@ export default function OnboardingFlow() {
   const [authPhone, setAuthPhone] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+
+  // Check for Google OAuth redirect result on mount
+  useEffect(() => {
+    checkRedirectAuth().then(async (res) => {
+      if (res && res.success && res.user) {
+        const userName = res.user.name || 'किसान (Google User)';
+        setDraft((c) => ({ ...c, name: userName }));
+        if (res.user.email) setAuthEmail(res.user.email);
+        await syncUserToMongoDB({
+          name: userName,
+          email: res.user.email,
+          phone_number: res.user.phone,
+          auth_provider: 'google_firebase',
+          firebase_uid: res.user.uid
+        });
+        setStep('crops');
+      }
+    });
+  }, []);
 
   // Derive localized strings based on currently selected language
   const S = useMemo(() => getOB(language), [language]);

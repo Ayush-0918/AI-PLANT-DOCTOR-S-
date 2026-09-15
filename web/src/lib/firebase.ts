@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult
+} from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCC_Vp5W4RY8HXio39fHXBtul9i86ulSps",
@@ -14,6 +20,33 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Custom parameters to ensure clean Google OAuth account selection
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
+export async function checkRedirectAuth() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      const user = result.user;
+      return {
+        success: true,
+        user: {
+          name: user.displayName || 'Farmer',
+          email: user.email || '',
+          phone: user.phoneNumber || '',
+          uid: user.uid,
+          photoURL: user.photoURL || '',
+        }
+      };
+    }
+  } catch (err) {
+    console.warn('Redirect auth result check:', err);
+  }
+  return null;
+}
 
 export async function signInWithGoogle() {
   try {
@@ -30,15 +63,16 @@ export async function signInWithGoogle() {
       }
     };
   } catch (error: any) {
-    if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
-      console.warn('Google Sign-In popup closed by user.');
-      return {
-        success: false,
-        closedByUser: true,
-        error: ''
-      };
+    console.warn('signInWithPopup error/blocked, attempting redirect fallback:', error?.code || error);
+    if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        return { success: false, redirecting: true, error: '' };
+      } catch (redirectErr: any) {
+        console.error('Redirect auth error:', redirectErr);
+        return { success: false, error: redirectErr?.message || 'Google sign-in failed' };
+      }
     }
-    console.error('Firebase Google Auth error:', error);
     return {
       success: false,
       error: error.message || 'Google sign-in failed'
